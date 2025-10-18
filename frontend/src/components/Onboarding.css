@@ -1,0 +1,76 @@
+.onboarding {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(to bottom, #0a0a0a, #111, #0a0a0a);
+  color: white;
+  padding: 40px;
+}
+
+.onboard {
+  width: 100%;
+  max-width: 500px;
+  padding: 40px;
+  text-align: center;
+  border-radius: 20px;
+}
+
+.onboard h2 {
+  font-size: 1.8rem;
+  margin-bottom: 10px;
+}
+
+.onboard p {
+  color: #aaa;
+  margin-bottom: 30px;
+}
+
+.onboard-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.onboard-form input,
+.onboard-form textarea {
+  padding: 12px;
+  border-radius: 10px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #eee;
+}
+
+.onboard-form textarea {
+  height: 100px;
+  resize: none;
+}
+
+.onboard-form input:focus,
+.onboard-form textarea:focus {
+  border-color: #2563eb;
+  outline: none;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn-primary:hover {
+  background: #3b82f6;
+}
+
+/* Error Message */
+.onboarding-error {
+  text-align: center;
+  padding: 80px;
+  color: white;
+}
+.onboarding-error h2 {
+  color: #ef4444;
+}
