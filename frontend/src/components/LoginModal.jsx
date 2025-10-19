@@ -62,6 +62,7 @@ export default function LoginModal({ onClose }) {
       setError("Network error. Please try again.");
     }
   };
+  
 
   if (showSignup) return <SignupModal onClose={onClose} />;
 

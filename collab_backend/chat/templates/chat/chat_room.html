@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    #container { display: flex; height: 90vh; }
+    #user-list { width: 200px; border-right: 1px solid #ccc; overflow-y: auto; padding: 10px; background: #f9f9f9; }
+    .user-item { padding: 8px; cursor: pointer; border-radius: 4px; margin-bottom: 3px; }
+    .user-item:hover { background-color: #e0e0e0; }
+    .active { background-color: #d0d0d0; font-weight: bold; }
+    #chat-area { flex: 1; display: flex; flex-direction: column; padding: 10px; }
+    #chat-with { margin-bottom: 5px; font-weight: bold; }
+    #chat-log { flex: 1; border: 1px solid black; overflow-y: auto; padding: 10px; margin-bottom: 10px; background: #fff; }
+    #input-area { display: flex; }
+    #chat-message-input { flex: 1; padding: 8px; }
+    #chat-message-submit { padding: 8px 12px; margin-left: 5px; }
+  </style>
+</head>
+<body>
+<h2 id="welcome-header" style="padding-left: 10px;">Logged in as: {{ request.user.username }}</h2>
+
+<div id="container">
+  <!-- User List -->
+  <div id="user-list">
+    <h4>Users</h4>
+    {% for user in users %}
+      {% if user.id != request.user.id %}
+        <div class="user-item {% if user.id == other_user.id %}active{% endif %}" 
+             data-user-id="{{ user.id }}" data-username="{{ user.username }}">
+          {{ user.username }}
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- Chat Area -->
+  <div id="chat-area">
+    <div id="chat-with">Chat with: <span id="chat-username">{{ other_user.username }}</span></div>
+    <div id="chat-log"></div>
+
+    <div id="input-area">
+      <input id="chat-message-input" type="text" placeholder="Type a message..." />
+      <button id="chat-message-submit">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const currentUserId = "{{ request.user.id }}";
+let receiverId = "{{ other_user.id|default:'' }}";
+const senderId = parseInt(currentUserId, 10);
+receiverId = receiverId ? parseInt(receiverId, 10) : null;
+
+const chatLog = document.getElementById('chat-log');
+const input = document.getElementById('chat-message-input');
+const button = document.getElementById('chat-message-submit');
+const chatUsername = document.getElementById('chat-username');
+const welcomeHeader = document.getElementById('welcome-header');
+const userItems = document.querySelectorAll('.user-item');
+let ws = null;
+
+// --- Load chat history ---
+function loadChatHistory(receiver) {
+  fetch(`/chat/chat/history/${currentUserId}/${receiver}/`)
+  
+    .then(res => res.json())
+    .then(data => {
+      chatLog.innerHTML = '';
+      data.forEach(msg => {
+        const msgDiv = document.createElement('div');
+        msgDiv.textContent = msg.sender_id === currentUserId ? `You: ${msg.message}` : `${msg.sender_name}: ${msg.message}`;
+        chatLog.appendChild(msgDiv);
+      });
+      chatLog.scrollTop = chatLog.scrollHeight;
+    });
+}
+
+loadChatHistory(receiverId);
+
+// --- Open WebSocket for current chat ---
+function openWebSocket(receiver) {
+  if (ws) ws.close();
+  ws = new WebSocket(`ws://${window.location.host}/ws/chat/${receiver}/`);
+
+  ws.onopen = () => console.log("WebSocket connected to user " + receiver);
+
+  ws.onmessage = event => {
+    const data = JSON.parse(event.data);
+    const msgDiv = document.createElement('div');
+    msgDiv.textContent = data.sender_id === currentUserId ? `You: ${data.message}` : `${data.sender_name}: ${data.message}`;
+    chatLog.appendChild(msgDiv);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  };
+
+  ws.onclose = () => console.log("WebSocket disconnected");
+}
+
+openWebSocket(receiverId);
+
+// --- Switch user when clicked ---
+userItems.forEach(item => {
+  item.addEventListener('click', () => {
+    const newReceiverId = parseInt(item.dataset.userId);
+    if (newReceiverId === receiverId) return;
+
+    // Highlight selected user
+    userItems.forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+
+    receiverId = newReceiverId;
+    const username = item.dataset.username;
+
+    chatUsername.textContent = username;
+    welcomeHeader.textContent = `Logged in as: {{ request.user.username }} (Chatting with: ${username})`;
+
+    loadChatHistory(receiverId);
+    openWebSocket(receiverId);
+
+    history.pushState(null, '', `/chat/${receiverId}/`);
+  });
+});
+
+// --- Send message ---
+function sendMessage() {
+  if (!receiverId) return alert("Select a user first!");
+  const message = input.value.trim();
+  if (!message) return;
+
+  ws.send(JSON.stringify({
+    message: message,
+    sender_id: currentUserId,
+    receiver_id: receiverId
+  }));
+
+  const msgDiv = document.createElement('div');
+  msgDiv.textContent = `You: ${message}`;
+  chatLog.appendChild(msgDiv);
+  chatLog.scrollTop = chatLog.scrollHeight;
+  input.value = '';
+}
+
+button.onclick = sendMessage;
+input.addEventListener('keypress', e => {
+  if (e.key === 'Enter') sendMessage();
+});
+
+// --- Handle browser back/forward navigation ---
+window.addEventListener('popstate', () => {
+  const pathParts = window.location.pathname.split('/');
+  const userId = parseInt(pathParts[pathParts.length - 2]);
+  const selectedItem = document.querySelector(`.user-item[data-user-id='${userId}']`);
+  if (selectedItem) selectedItem.click();
+});
+
+</script>
+</body>
+</html>
