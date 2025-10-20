@@ -9,7 +9,7 @@ export default function ChatApp() {
   const [wsConnected, setWsConnected] = useState(false);
   const ws = useRef(null);
 
-  const BASE_URL = "http://127.0.0.1:8000";
+ const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
   // Load logged-in user
   useEffect(() => {
@@ -69,7 +69,7 @@ export default function ChatApp() {
     const token = localStorage.getItem("access");
     if (!token) return;
 
-    const WS_URL = `ws://127.0.0.1:8000/ws/chat/${selectedUser.id}/?token=${token}`;
+    const WS_URL = `${import.meta.env.VITE_WS_BASE_URL}/chat/${selectedUser.id}/?token=${token}`;
     ws.current = new WebSocket(WS_URL);
 
     ws.current.onopen = () => {
