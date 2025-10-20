@@ -17,7 +17,8 @@ SECRET_KEY = 'django-insecure-v!44#o1i@#b05ehrn@e#=d0+^eo9y^sa3pb(1cry5m#=t(g1n8
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ["*"]  # allow all during development
+ALLOWED_HOSTS = ["collabcreation.onrender.com", "www.collabcreation.onrender.com"]
+  # allow all during development
 
 
 # ---------------------------------------------------------------------
@@ -87,8 +88,12 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
-   # "https://collabcreation.vercel.app/",
+    "https://collabcreation.onrender.com",
 ]
+
+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 
 
 # ---------------------------------------------------------------------
