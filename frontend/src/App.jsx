@@ -8,7 +8,7 @@ import Chat from "./pages/Chat";
 import Wallet from "./pages/Wallet";
 import Ratings from "./pages/Ratings";
 import Security from "./pages/Security";
-
+import Login from "./components/LoginModal"; // Add login route
 
 function App() {
   return (
@@ -17,6 +17,7 @@ function App() {
         <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/chat" element={<Chat />} />
@@ -31,9 +32,3 @@ function App() {
 }
 
 export default App;
-/**<Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/chat" element={<Chat />} />
-          <Route path="/wallet" element={<Wallet />} />
-          <Route path="/ratings" element={<Ratings />} />
-          <Route path="/security" element={<Security />} /> */

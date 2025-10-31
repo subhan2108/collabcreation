@@ -44,7 +44,7 @@ export default function LoginModal({ onClose }) {
       setSuccess("Login successful! Redirecting...");
 
       setTimeout(() => {
-        onClose();
+        if (onClose) onClose();
 
         // ✅ Check if onboarding is complete
         const onboardingComplete =
@@ -69,8 +69,7 @@ export default function LoginModal({ onClose }) {
   return (
     <div className="modal-overlay">
       <div className="modal glass">
-        <button className="close-btn" onClick={onClose}>✖</button>
-        <h2>Login</h2>
+        <button className="close-btn" onClick={() => { if (onClose) onClose(); }}>✖</button>
 
         <form onSubmit={handleSubmit}>
           <input

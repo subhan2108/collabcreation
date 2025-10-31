@@ -1,25 +1,26 @@
 import { useEffect, useState } from "react";
+import { Bell } from "lucide-react"; // ✅ Notification icon (Lucide or use any icon lib)
+
 
 export default function CreatorDashboard() {
-  // --- State variables ---
   const [profile, setProfile] = useState(null);
   const [projects, setProjects] = useState([]);
-  const [notifications, setNotifications] = useState([]); // ✅ fixed
+  const [notifications, setNotifications] = useState([]);
+  const [unread, setUnread] = useState(false); // ✅ for red dot indicator
+  const [showDropdown, setShowDropdown] = useState(false);
   const [appliedProjects, setAppliedProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // --- API setup ---
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
   const token = localStorage.getItem("access");
 
   // ==========================================================
-  // 📨 FETCH NOTIFICATIONS (Hire / Reject messages)
+  // 📨 FETCH NOTIFICATIONS
   // ==========================================================
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        console.log("📡 Fetching notifications...");
         const res = await fetch(`${API_BASE}/notifications/`, {
           headers: {
             "Content-Type": "application/json",
@@ -27,35 +28,26 @@ export default function CreatorDashboard() {
           },
         });
 
-        if (!res.ok) {
-          const text = await res.text();
-          console.error("Notification fetch failed:", text);
-          return;
-        }
-
+        if (!res.ok) return;
         const data = await res.json();
         setNotifications(data);
-        console.log("✅ Notifications from backend:", data);
+        setUnread(data.length > 0); // ✅ show red dot if any notification
       } catch (err) {
         console.error("❌ Error fetching notifications:", err);
       }
     };
 
     fetchNotifications();
-
-    // Optional: auto-refresh notifications every 10s
     const interval = setInterval(fetchNotifications, 10000);
     return () => clearInterval(interval);
   }, [API_BASE, token]);
 
   // ==========================================================
-  // 🧭 FETCH DASHBOARD DATA (Profile + Projects)
+  // 🧭 FETCH DASHBOARD DATA
   // ==========================================================
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        console.log("📡 Fetching profile & projects...");
-        // --- Creator Profile ---
         const profileRes = await fetch(`${API_BASE}/creator-profile/`, {
           headers: {
             "Content-Type": "application/json",
@@ -63,14 +55,11 @@ export default function CreatorDashboard() {
           },
         });
 
-        if (!profileRes.ok)
-          throw new Error(`Profile fetch failed: ${profileRes.status}`);
+        if (!profileRes.ok) throw new Error(`Profile fetch failed`);
 
         const profileData = await profileRes.json();
         setProfile(profileData);
-        console.log("✅ Profile data:", profileData);
 
-        // --- All Projects ---
         const projectsRes = await fetch(`${API_BASE}/projects/`, {
           headers: {
             "Content-Type": "application/json",
@@ -78,14 +67,11 @@ export default function CreatorDashboard() {
           },
         });
 
-        if (!projectsRes.ok)
-          throw new Error(`Projects fetch failed: ${projectsRes.status}`);
+        if (!projectsRes.ok) throw new Error(`Projects fetch failed`);
 
         const projectsData = await projectsRes.json();
         setProjects(projectsData);
-        console.log("✅ Projects data:", projectsData);
       } catch (err) {
-        console.error("❌ Dashboard error:", err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -100,7 +86,6 @@ export default function CreatorDashboard() {
   // ==========================================================
   const handleApply = async (projectId) => {
     try {
-      console.log(`🚀 Applying for project ID: ${projectId}`);
       const res = await fetch(`${API_BASE}/applications/create/`, {
         method: "POST",
         headers: {
@@ -113,15 +98,11 @@ export default function CreatorDashboard() {
         }),
       });
 
-      const data = await res.json();
-      console.log("📦 Apply response:", data);
-
       if (!res.ok) throw new Error("Failed to apply for this project");
 
       setAppliedProjects((prev) => [...prev, projectId]);
       alert("✅ Applied successfully!");
     } catch (err) {
-      console.error("❌ Apply error:", err);
       alert("Could not apply. Check console for details.");
     }
   };
@@ -135,10 +116,15 @@ export default function CreatorDashboard() {
 
   return (
     <div className="dashboard">
-      <section id="creator" className="section">
+      {/* === Header with Notification Icon === */}
+      <header className="dashboard-header glass">
         <h1 className="section-title">Creator Dashboard</h1>
 
-        {/* ===== Profile Overview ===== */}
+        
+      </header>
+
+      {/* === Profile Section === */}
+      <section id="creator" className="section">
         <div className="profile-card glass">
           <img
             src={profile.profile_image || "/default-avatar.png"}
@@ -148,21 +134,12 @@ export default function CreatorDashboard() {
           <div>
             <h2>{profile.full_name || "Unnamed Creator"}</h2>
             <p>@{profile.username || "unknown"}</p>
-            <p>
-              <strong>Platform:</strong> {profile.primary_platform || "N/A"}
-            </p>
-            <p>
-              <strong>Followers:</strong> {profile.followers_count || 0}
-            </p>
-            {profile.bio && (
-              <p>
-                <strong>Bio:</strong> {profile.bio}
-              </p>
-            )}
+            <p><strong>Platform:</strong> {profile.primary_platform || "N/A"}</p>
+            <p><strong>Followers:</strong> {profile.followers_count || 0}</p>
+            {profile.bio && <p><strong>Bio:</strong> {profile.bio}</p>}
           </div>
         </div>
 
-        {/* ===== Stats Section ===== */}
         <div className="stats-grid">
           <div className="stat-card glass">
             <p>Projects Applied</p>
@@ -177,11 +154,11 @@ export default function CreatorDashboard() {
             <h2>₹{profile.wallet_balance || 0}</h2>
           </div>
         </div>
+        
 
-        {/* ===== Browse Projects ===== */}
+        {/* === Browse Projects === */}
         <div className="projects">
           <h2>Browse Projects</h2>
-
           <div className="project-list">
             {projects.length > 0 ? (
               projects.map((p) => (
@@ -207,21 +184,36 @@ export default function CreatorDashboard() {
             )}
           </div>
         </div>
-      </section>
+        <div className="notification-wrapper">
+          <button
+            className="notification-btn"
+            onClick={() => {
+              setShowDropdown(!showDropdown);
+              setUnread(false); // ✅ mark as read when opened
+            }}
+          >
+            <Bell size={22} color="white" />
+            {unread && <span className="notification-dot"></span>}
+          </button>
 
-      {/* ===== Notifications Section ===== */}
-      <div className="notifications glass">
-        <h2>Notifications</h2>
-        {notifications.length > 0 ? (
-          notifications.map((n) => (
-            <p key={n.id}>
-              📩 <strong>{n.message}</strong>
-            </p>
-          ))
-        ) : (
-          <p>No notifications yet.</p>
-        )}
-      </div>
+          {showDropdown && (
+            <div className="notification-dropdown glass">
+              <h4>Notifications</h4>
+              {notifications.length > 0 ? (
+                notifications.map((n) => (
+                  <p key={n.id} className="notification-item">
+                    📩 {n.message}
+                  </p>
+                ))
+              ) : (
+                <p className="empty-msg">No new notifications</p>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+      
     </div>
   );
 }
+

@@ -60,3 +60,13 @@ class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
         fields = ['id', 'message', 'created_at', 'is_read']
+
+class ReviewSerializer(serializers.ModelSerializer):
+    reviewer_name = serializers.CharField(source='reviewer.username', read_only=True)
+    reviewee_name = serializers.CharField(source='reviewee.username', read_only=True)
+    project_title = serializers.CharField(source='project.title', read_only=True)
+
+    class Meta:
+        model = Review
+        fields = ['id', 'reviewer', 'reviewer_name', 'reviewee', 'reviewee_name', 'project', 'project_title', 'rating', 'review_text', 'created_at']
+        read_only_fields = ['reviewer', 'created_at']

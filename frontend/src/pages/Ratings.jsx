@@ -1,13 +1,114 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Ratings() {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
+  const [reviewText, setReviewText] = useState("");
+  const [reviews, setReviews] = useState([]);
+  const [averageRating, setAverageRating] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [filterRating, setFilterRating] = useState(0);
+  const reviewsPerPage = 5;
+
+  // Assume user ID is stored in localStorage or context
+  const currentUserId = JSON.parse(localStorage.getItem('user'))?.id || 1; // Replace with actual user ID from auth context
+  const revieweeId = new URLSearchParams(window.location.search).get('user') || 2; // Get from URL param, e.g., ?user=2
+
+  useEffect(() => {
+    fetchReviews();
+    fetchAverageRating();
+  }, [revieweeId, currentPage, filterRating]);
+
+  const fetchReviews = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`http://localhost:8000/api/reviews/?reviewee=${revieweeId}&page=${currentPage}&rating=${filterRating}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setReviews(data.results || data);
+      }
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+    }
+  };
+
+  const fetchAverageRating = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`http://localhost:8000/api/reviews/average-rating/${revieweeId}/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAverageRating(data.average_rating);
+        setReviewCount(data.review_count);
+      }
+    } catch (error) {
+      console.error('Error fetching average rating:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitReview = async () => {
+    if (rating === 0) {
+      alert('Please select a rating');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('http://localhost:8000/api/reviews/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          reviewee: revieweeId,
+          rating: rating,
+          review_text: reviewText,
+          project: null, // Optional
+        }),
+      });
+      if (response.ok) {
+        alert('Review submitted successfully!');
+        setRating(0);
+        setReviewText("");
+        fetchReviews();
+        fetchAverageRating();
+      } else {
+        alert('Failed to submit review');
+      }
+    } catch (error) {
+      console.error('Error submitting review:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const renderStars = (rating) => {
+    return [1, 2, 3, 4, 5].map((star) => (
+      <span key={star} className={`star ${rating >= star ? "active" : ""}`}>
+        ★
+      </span>
+    ));
+  };
+
+  const filteredReviews = reviews.filter(review => filterRating === 0 || review.rating === filterRating);
 
   return (
     <div className="ratings-page">
-
       <main className="main">
         {/* ===== RATE & REVIEW ===== */}
         <section className="section">
@@ -20,9 +121,7 @@ export default function Ratings() {
               {[1, 2, 3, 4, 5].map((star) => (
                 <span
                   key={star}
-                  className={`star ${
-                    (hover || rating) >= star ? "active" : ""
-                  }`}
+                  className={`star ${(hover || rating) >= star ? "active" : ""}`}
                   onMouseEnter={() => setHover(star)}
                   onMouseLeave={() => setHover(0)}
                   onClick={() => setRating(star)}
@@ -32,8 +131,14 @@ export default function Ratings() {
               ))}
             </div>
 
-            <textarea placeholder="Write your review..."></textarea>
-            <button className="btn-primary">Submit Review</button>
+            <textarea
+              placeholder="Write your review..."
+              value={reviewText}
+              onChange={(e) => setReviewText(e.target.value)}
+            />
+            <button className="btn-primary" onClick={submitReview} disabled={submitting}>
+              {submitting ? 'Submitting...' : 'Submit Review'}
+            </button>
           </div>
         </section>
 
@@ -43,48 +148,62 @@ export default function Ratings() {
 
           {/* Average Rating */}
           <div className="avg-rating glass">
-            <div className="stars-display">★★★★☆</div>
+            <div className="stars-display">{renderStars(Math.round(averageRating))}</div>
             <p>
-              <strong>4.0 / 5.0</strong>{" "}
-              <span className="sub">(25 reviews)</span>
+              <strong>{averageRating.toFixed(1)} / 5.0</strong>{" "}
+              <span className="sub">({reviewCount} reviews)</span>
             </p>
+          </div>
+
+          {/* Filter */}
+          <div className="filter">
+            <label>Filter by rating:</label>
+            <select value={filterRating} onChange={(e) => setFilterRating(parseInt(e.target.value))}>
+              <option value={0}>All</option>
+              <option value={5}>5 stars</option>
+              <option value={4}>4 stars</option>
+              <option value={3}>3 stars</option>
+              <option value={2}>2 stars</option>
+              <option value={1}>1 star</option>
+            </select>
           </div>
 
           {/* Review List */}
           <div className="reviews">
-            <div className="review-card glass">
-              <div className="review-header">
-                <p className="name">John Doe</p>
-                <p className="date">Oct 03, 2025</p>
-              </div>
-              <div className="stars-small">★★★★☆</div>
-              <p className="text">
-                Great experience! The creator was professional and delivered on
-                time.
-              </p>
-            </div>
+            {loading ? (
+              <p>Loading reviews...</p>
+            ) : filteredReviews.length === 0 ? (
+              <p>No reviews yet.</p>
+            ) : (
+              filteredReviews.map((review) => (
+                <div key={review.id} className="review-card glass">
+                  <div className="review-header">
+                    <p className="name">{review.reviewer_name}</p>
+                    <p className="date">{new Date(review.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <div className="stars-small">{renderStars(review.rating)}</div>
+                  <p className="text">{review.review_text}</p>
+                  {review.project_title && <p className="project">Project: {review.project_title}</p>}
+                </div>
+              ))
+            )}
+          </div>
 
-            <div className="review-card glass">
-              <div className="review-header">
-                <p className="name">Sara Khan</p>
-                <p className="date">Oct 10, 2025</p>
-              </div>
-              <div className="stars-small">★★★★★</div>
-              <p className="text">
-                Fantastic collaboration! The content exceeded expectations.
-              </p>
-            </div>
-
-            <div className="review-card glass">
-              <div className="review-header">
-                <p className="name">Techify Brand</p>
-                <p className="date">Oct 15, 2025</p>
-              </div>
-              <div className="stars-small">★★★☆☆</div>
-              <p className="text">
-                Good work overall, but delivery was slightly delayed.
-              </p>
-            </div>
+          {/* Pagination */}
+          <div className="pagination">
+            <button
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </button>
+            <span>Page {currentPage}</span>
+            <button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={filteredReviews.length < reviewsPerPage}
+            >
+              Next
+            </button>
           </div>
         </section>
 
@@ -144,8 +263,6 @@ export default function Ratings() {
           </div>
         </section>
       </main>
-
-
     </div>
   );
 }

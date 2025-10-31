@@ -10,6 +10,15 @@ class User(AbstractUser):
     ]
     email = models.EmailField(unique=True)  # make email unique
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="creator")
+    last_seen = models.DateTimeField(null=True, blank=True)
+    is_online = models.BooleanField(default=False)
+
+    @property
+    def average_rating(self):
+        reviews = self.reviews_received.all()
+        if reviews.exists():
+            return round(sum(review.rating for review in reviews) / reviews.count(), 1)
+        return 0.0
 
     def __str__(self):
         return self.username
@@ -72,3 +81,14 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.recipient.username} - {self.message}"
+
+class Review(models.Model):
+    reviewer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews_given')
+    reviewee = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews_received')
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, null=True, blank=True)
+    rating = models.IntegerField(choices=[(i, i) for i in range(1, 6)])
+    review_text = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Review by {self.reviewer.username} for {self.reviewee.username}: {self.rating} stars"

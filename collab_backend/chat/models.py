@@ -14,6 +14,8 @@ class ChatMessage(models.Model):
     )
     message = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+    edited_at = models.DateTimeField(null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
 
     def __str__(self):
         return f"From {self.sender} to {self.receiver}: {self.message[:30]}"

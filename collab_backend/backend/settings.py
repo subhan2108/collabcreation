@@ -17,8 +17,7 @@ SECRET_KEY = 'django-insecure-v!44#o1i@#b05ehrn@e#=d0+^eo9y^sa3pb(1cry5m#=t(g1n8
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ["collabcreation.onrender.com", "www.collabcreation.onrender.com"]
-  # allow all during development
+ALLOWED_HOSTS = ["collabcreation.onrender.com", "www.collabcreation.onrender.com", "127.0.0.1:8001","127.0.0.1:8000","localhost","127.0.0.1"]
 
 
 # ---------------------------------------------------------------------
@@ -61,7 +60,7 @@ ASGI_APPLICATION = 'backend.asgi.application'
 
 import os
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379")
+REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6380")
 
 CHANNEL_LAYERS = {
     'default': {
@@ -98,6 +97,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://collabcreation.vercel.app",
+    "http://localhost:5174",
 ]
 CORS_ALLOW_CREDENTIALS = True
 

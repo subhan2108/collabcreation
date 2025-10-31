@@ -195,3 +195,35 @@ class NotificationListView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         return Notification.objects.filter(recipient=user).order_by('-created_at')
+
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+class ReviewViewSet(viewsets.ModelViewSet):
+    serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        reviewee_id = self.request.query_params.get('reviewee', None)
+        if reviewee_id:
+            return Review.objects.filter(reviewee_id=reviewee_id).order_by('-created_at')
+        return Review.objects.filter(reviewee=user).order_by('-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save(reviewer=self.request.user)
+
+    @action(detail=False, methods=['get'], url_path='average-rating/(?P<user_id>\d+)')
+    def average_rating(self, request, user_id=None):
+        try:
+            user = User.objects.get(id=user_id)
+            avg_rating = user.average_rating
+            review_count = user.reviews_received.count()
+            return Response({
+                'average_rating': avg_rating,
+                'review_count': review_count
+            })
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
