@@ -1,16 +1,19 @@
+from django.contrib.auth import authenticate, get_user_model
+from rest_framework import generics, permissions, status, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate, get_user_model
-from .serializers import RegisterSerializer
-from rest_framework import generics, permissions
+
 from .models import *
 from .serializers import *
-from rest_framework.response import Response
-from rest_framework import status
 
 User = get_user_model()
+
+# ---------------------------
+# AUTH VIEWS
+# ---------------------------
 
 class RegisterView(APIView):
     def post(self, request):
@@ -19,7 +22,7 @@ class RegisterView(APIView):
             serializer.save()
             return Response({"message": "User registered successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-User = get_user_model()
+
 
 class LoginView(APIView):
     def post(self, request):
@@ -46,32 +49,37 @@ class LoginView(APIView):
             "username": user.username,
             "email": user.email,
             "role": user.role,
-        }, status=status.HTTP_200_OK)
+        })
 
 
-# Creator Onboarding
+# ---------------------------
+# ONBOARDING
+# ---------------------------
+
 class CreatorOnboardingView(generics.CreateAPIView):
     serializer_class = CreatorProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        # Check if user already submitted
         if hasattr(self.request.user, 'creatorprofile'):
-            return Response({'detail': 'Profile already exists'}, status=status.HTTP_400_BAD_REQUEST)
+            raise NotFound("Profile already exists.")
         serializer.save(user=self.request.user)
 
-# Brand Onboarding
+
 class BrandOnboardingView(generics.CreateAPIView):
     serializer_class = BrandProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
         if hasattr(self.request.user, 'brandprofile'):
-            return Response({'detail': 'Profile already exists'}, status=status.HTTP_400_BAD_REQUEST)
+            raise NotFound("Profile already exists.")
         serializer.save(user=self.request.user)
 
 
-# Profile views
+# ---------------------------
+# PROFILE VIEWS
+# ---------------------------
+
 class CreatorProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = CreatorProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -82,14 +90,21 @@ class CreatorProfileView(generics.RetrieveUpdateAPIView):
             return user.creatorprofile
         raise NotFound("No creator profile found for this user.")
 
+
 class BrandProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = BrandProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
-        return self.request.user.brandprofile
+        if hasattr(self.request.user, "brandprofile"):
+            return self.request.user.brandprofile
+        raise NotFound("No brand profile found for this user.")
 
-# Project views
+
+# ---------------------------
+# PROJECT VIEWS
+# ---------------------------
+
 class ProjectCreateView(generics.CreateAPIView):
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -97,18 +112,40 @@ class ProjectCreateView(generics.CreateAPIView):
     def perform_create(self, serializer):
         serializer.save(brand=self.request.user)
 
+
 class ProjectListView(generics.ListAPIView):
+    """
+    ✅ Shows all projects to everyone (creators & brands)
+    """
+    serializer_class = ProjectSerializer
+    permission_classes = [permissions.AllowAny]  # public view
+
+    def get_queryset(self):
+        return Project.objects.all().select_related("brand").order_by("-id")
+
+
+class MyProjectListView(generics.ListAPIView):
+    """
+    ✅ Shows only the logged-in brand's own projects
+    """
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Creators see all projects
-        if self.request.user.role == "creator":
-            return Project.objects.all()
-        # Brands see their own projects
-        return Project.objects.filter(brand=self.request.user)
+        user = self.request.user
+        return Project.objects.filter(brand=user).order_by("-id")
 
-# Application views
+
+class ProjectDetailView(generics.RetrieveAPIView):
+    queryset = Project.objects.all()
+    serializer_class = ProjectSerializer
+    permission_classes = [permissions.AllowAny]
+
+
+# ---------------------------
+# APPLICATION VIEWS
+# ---------------------------
+
 class ApplicationCreateView(generics.CreateAPIView):
     serializer_class = ApplicationSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -116,38 +153,16 @@ class ApplicationCreateView(generics.CreateAPIView):
     def perform_create(self, serializer):
         serializer.save(creator=self.request.user)
 
+
 class ApplicationListView(generics.ListAPIView):
     serializer_class = ApplicationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        if self.request.user.role == "brand":
-            return Application.objects.filter(project__brand=self.request.user)
-        return Application.objects.filter(creator=self.request.user)
-    
-
-class ApplicationHireView(APIView):
-    def post(self, request, pk):
-        try:
-            app = Application.objects.get(id=pk)
-            app.status = "hired"
-            app.save()
-            return Response({"success": True, "status": "hired"})
-        except Application.DoesNotExist:
-            return Response({"error": "Application not found"}, status=status.HTTP_404_NOT_FOUND)
-
-class ApplicationRejectView(APIView):
-    def post(self, request, pk):
-        try:
-            app = Application.objects.get(id=pk)
-            app.status = "rejected"
-            app.save()
-            return Response({"success": True, "status": "rejected"})
-        except Application.DoesNotExist:
-            return Response({"error": "Application not found"}, status=status.HTTP_404_NOT_FOUND)
-        
-
-
+        user = self.request.user
+        if hasattr(user, 'brandprofile'):
+            return Application.objects.filter(project__brand=user)
+        return Application.objects.filter(creator=user)
 
 
 class ApplicationHireView(APIView):
@@ -156,61 +171,56 @@ class ApplicationHireView(APIView):
             app = Application.objects.get(id=pk)
             app.status = "hired"
             app.save()
-
-            # ✅ Create notification for creator
-            Notification.objects.create(
-                recipient=app.creator,  # assuming creator has OneToOne field to User
-                message=f"🎉 Congratulations {app.creator.get_full_name() or app.creator.username}! You’ve been hired for '{app.project.title}'."
-
-            )
-
-            return Response({"success": True, "status": "hired"})
-        except Application.DoesNotExist:
-            return Response({"error": "Application not found"}, status=status.HTTP_404_NOT_FOUND)
-
-
-class ApplicationRejectView(APIView):
-    def post(self, request, pk):
-        try:
-            app = Application.objects.get(id=pk)
-            app.status = "rejected"
-            app.save()
-
-            # ✅ Create notification for creator
             Notification.objects.create(
                 recipient=app.creator,
-                message=f"❌ Sorry {app.creator.get_full_name() or app.creator.username}, you were not selected for '{app.project.title}'."
-
+                message=f"🎉 Congratulations {app.creator.username}, you’ve been hired for '{app.project.title}'."
             )
+            return Response({"success": True, "status": "hired"})
+        except Application.DoesNotExist:
+            return Response({"error": "Application not found"}, status=status.HTTP_404_NOT_FOUND)
 
+
+class ApplicationRejectView(APIView):
+    def post(self, request, pk):
+        try:
+            app = Application.objects.get(id=pk)
+            app.status = "rejected"
+            app.save()
+            Notification.objects.create(
+                recipient=app.creator,
+                message=f"❌ Sorry {app.creator.username}, you were not selected for '{app.project.title}'."
+            )
             return Response({"success": True, "status": "rejected"})
         except Application.DoesNotExist:
             return Response({"error": "Application not found"}, status=status.HTTP_404_NOT_FOUND)
-        
 
+
+# ---------------------------
+# NOTIFICATIONS
+# ---------------------------
 
 class NotificationListView(generics.ListAPIView):
     serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
         return Notification.objects.filter(recipient=user).order_by('-created_at')
 
-from rest_framework import viewsets
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+
+# ---------------------------
+# REVIEWS
+# ---------------------------
 
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        user = self.request.user
-        reviewee_id = self.request.query_params.get('reviewee', None)
+        reviewee_id = self.request.query_params.get('reviewee')
         if reviewee_id:
             return Review.objects.filter(reviewee_id=reviewee_id).order_by('-created_at')
-        return Review.objects.filter(reviewee=user).order_by('-created_at')
+        return Review.objects.filter(reviewee=self.request.user).order_by('-created_at')
 
     def perform_create(self, serializer):
         serializer.save(reviewer=self.request.user)
@@ -227,3 +237,60 @@ class ReviewViewSet(viewsets.ModelViewSet):
             })
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=404)
+
+
+# ---------------------------
+# LIST VIEWS (ALL CREATORS / BRANDS)
+# ---------------------------
+
+class CreatorListView(generics.ListAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        return User.objects.filter(role='creator')
+
+
+class BrandListView(generics.ListAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        return User.objects.filter(role='brand')
+
+
+# ---------------------------
+# DETAIL VIEWS (CREATOR / BRAND)
+# ---------------------------
+
+class BrandDetailView(generics.RetrieveAPIView):
+    serializer_class = BrandProfileSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self):
+        user_id = self.kwargs['pk']
+        try:
+            return BrandProfile.objects.get(user_id=user_id)
+        except BrandProfile.DoesNotExist:
+            raise NotFound("Brand profile not found")
+
+
+class CreatorDetailView(generics.RetrieveAPIView):
+    serializer_class = CreatorProfileSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self):
+        user_id = self.kwargs['pk']
+        try:
+            return CreatorProfile.objects.get(user_id=user_id)
+        except CreatorProfile.DoesNotExist:
+            raise NotFound("Creator profile not found")
+
+
+class BrandProjectsView(generics.ListAPIView):
+    serializer_class = ProjectSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        brand_user_id = self.kwargs['pk']
+        return Project.objects.filter(brand_id=brand_user_id)

@@ -9,11 +9,19 @@ import Wallet from "./pages/Wallet";
 import Ratings from "./pages/Ratings";
 import Security from "./pages/Security";
 import Login from "./components/LoginModal"; // Add login route
+import CreatorProfilesPage from "./pages/CreatorProfilesPage";
+import BrandProfilesPage from "./pages/BrandProfilesPage";
+import ProjectList from "./pages/ProjectList";
+import ProjectDetail from "./pages/ProjectDetail";
+import BrandDetail from "./pages/BrandDetail";
+import BrandDashboardViewer from "./pages/BrandDashboardViewer";
+import CreatorDashboardViewer from "./pages/CreatorDashboardViewer";
+import NotFound from "./pages/NotFound";
 
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-gradient-to-b from-neutral-950 via-neutral-900 to-neutral-950 text-neutral-100 font-sans">
+      <div className="app-container">
         <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />
@@ -24,6 +32,16 @@ function App() {
           <Route path="/wallet" element={<Wallet />} />
           <Route path="/ratings" element={<Ratings />} />
           <Route path="/security" element={<Security />} />
+          <Route path="/creators" element={<CreatorProfilesPage />} />
+          <Route path="/brands" element={<BrandProfilesPage />} />
+          {/* 💼 Projects */}
+          <Route path="/projects" element={<ProjectList />} />
+          <Route path="/projects/:id" element={<ProjectDetail />} />
+          {/* 🏢 Brand Detail */}
+          <Route path="/brands/:id" element={<BrandDetail />} />
+          <Route path="/brands/:id/dashboard" element={<BrandDashboardViewer />} />
+          <Route path="/creators/:id/dashboard" element={<CreatorDashboardViewer />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
         <Footer />
       </div>

@@ -34,10 +34,15 @@ class CreatorProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ['user']
 
 class BrandProfileSerializer(serializers.ModelSerializer):
+    projects_count = serializers.SerializerMethodField()
+
     class Meta:
         model = BrandProfile
         fields = '__all__'
         read_only_fields = ['user']
+
+    def get_projects_count(self, obj):
+        return obj.user.projects.count()
 
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
@@ -70,3 +75,8 @@ class ReviewSerializer(serializers.ModelSerializer):
         model = Review
         fields = ['id', 'reviewer', 'reviewer_name', 'reviewee', 'reviewee_name', 'project', 'project_title', 'rating', 'review_text', 'created_at']
         read_only_fields = ['reviewer', 'created_at']
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'role']

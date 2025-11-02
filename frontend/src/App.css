@@ -628,3 +628,12 @@ footer {
     max-width: 85%;
   }
 }
+
+
+
+.app-container {
+  min-height: 100vh;
+  background: linear-gradient(to bottom, #0a0a0a, #1a1a1a, #0a0a0a);
+  color: #f5f5f5;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
