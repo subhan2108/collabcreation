@@ -18,28 +18,42 @@ export default function BrandDashboard() {
 
   // --- Hire / Reject Handlers ---
   const handleHire = async (applicationId) => {
-    try {
-      const res = await fetch(
-        `${API_BASE}/applications/${applicationId}/hire/`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      const data = await res.json();
-      console.log("Hire response:", data);
+  try {
+    const res = await fetch(
+      `${API_BASE}/applications/${applicationId}/hire/`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
 
-      if (!res.ok) throw new Error("Hire failed");
-      alert("✅ Creator hired!");
-      setApplications((prev) => prev.filter((a) => a.id !== applicationId));
-    } catch (err) {
-      console.error(err);
-      alert("❌ Could not hire creator. Check console.");
+    const data = await res.json();
+    console.log("Hire response:", data);
+
+    if (!res.ok) throw new Error("Hire failed");
+
+    // ✅ Ask user
+    const openMutual = window.confirm(
+      "✅ Creator hired successfully! \n\nDo you want to open the collaboration page?"
+    );
+
+    if (openMutual) {
+      // redirect to mutual page
+      window.location.href = `/mutual/${data.collaboration_id}`;
     }
-  };
+
+    // remove application from list
+    setApplications((prev) => prev.filter((a) => a.id !== applicationId));
+
+  } catch (err) {
+    console.error(err);
+    alert("❌ Could not hire creator. Check console.");
+  }
+};
+
 
   const handleReject = async (applicationId) => {
     try {

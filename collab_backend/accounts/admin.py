@@ -25,3 +25,7 @@ class BrandProfileAdmin(admin.ModelAdmin):
     list_filter = ('approved', 'banned')
     search_fields = ('user__username', 'brand_name', 'primary_goal')
 
+
+
+admin.site.register(Collaboration)
+

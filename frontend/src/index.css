@@ -2054,3 +2054,199 @@ textarea:focus {
   margin-top: 50px;
   font-size: 18px;
 }
+
+
+.mutual-container {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 30px;
+  background: #ffffff00;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  font-family: "Poppins", sans-serif;
+}
+
+.mutual-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.mutual-header h1 {
+  font-size: 28px;
+  color: #333;
+}
+
+.mutual-header p {
+  color: #777;
+  margin-top: 5px;
+}
+
+.project-card {
+  background: #f8f9fb00;
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 30px;
+}
+
+.project-card h2 {
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.project-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.participants {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.creator-card, .brand-card {
+  width: 45%;
+  background: #f1f4f900;
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+  border: 1px solid #fff;
+}
+
+.profile-pic {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 15px;
+}
+
+.actions {
+  text-align: center;
+}
+
+.action-btn {
+  display: inline-block;
+  padding: 12px 20px;
+  margin: 10px;
+  border-radius: 8px;
+  font-weight: 500;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.chat-btn {
+  background-color: #007bff;
+  color: white;
+}
+
+.view-btn {
+  background-color: #28a745;
+  color: white;
+}
+
+.end-btn {
+  background-color: #dc3545;
+  color: white;
+}
+
+.action-btn:hover {
+  opacity: 0.85;
+}
+
+
+
+
+.msg {
+  position: relative;
+}
+
+.message-actions {
+  position: absolute;
+  top: -18px;
+  right: 5px;
+  opacity: 0;
+  display: flex;
+  gap: 6px;
+  transition: opacity 0.3s ease;
+}
+
+.msg:hover .message-actions {
+  opacity: 1;
+}
+
+.edit-btn,
+.delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: gray;
+}
+
+.edit-btn:hover {
+  color: blue;
+}
+
+.delete-btn:hover {
+  color: red;
+}
+
+
+
+.popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.popup {
+  background: white;
+  color: #222;
+  padding: 2rem;
+  border-radius: 1rem;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+}
+
+.popup-actions {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 1.5rem;
+}
+
+.popup .btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 0.7rem 1.5rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.popup .btn:hover {
+  background: #0056b3;
+}
+
+.popup .close-btn {
+  background: none;
+  border: none;
+  color: #555;
+  font-size: 1.2rem;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  cursor: pointer;
+}

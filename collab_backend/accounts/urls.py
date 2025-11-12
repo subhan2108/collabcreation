@@ -1,17 +1,5 @@
 from django.urls import path
-from .views import (
-    RegisterView, LoginView,
-    CreatorOnboardingView, BrandOnboardingView,
-    CreatorProfileView, BrandProfileView,
-    ProjectListView, ProjectCreateView, ProjectDetailView,
-    ApplicationListView, ApplicationCreateView,
-    ApplicationHireView, ApplicationRejectView,
-    NotificationListView,
-    ReviewViewSet,
-    CreatorListView, BrandListView,
-    BrandDetailView, CreatorDetailView,
-    BrandProjectsView
-)
+from .views import *
 
 urlpatterns = [
     # 🧍‍♂️ Authentication
@@ -57,4 +45,8 @@ urlpatterns = [
         'delete': 'destroy'
     }), name="review-detail"),
     path("reviews/average-rating/<int:user_id>/", ReviewViewSet.as_view({'get': 'average_rating'}), name="average-rating"),
+    path("guest/register/", GuestRegisterView.as_view(), name="guest-register"),
+    path('collaborations/', CollaborationListView.as_view(), name='collaboration-list'),
+    path("onboarding-status/", onboarding_status),
+
 ]

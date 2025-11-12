@@ -64,7 +64,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
-        fields = ['id', 'message', 'created_at', 'is_read']
+        fields = ['id', 'message', 'created_at', 'is_read', 'data']
 
 class ReviewSerializer(serializers.ModelSerializer):
     reviewer_name = serializers.CharField(source='reviewer.username', read_only=True)
@@ -80,3 +80,14 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'role']
+
+
+
+class CollaborationSerializer(serializers.ModelSerializer):
+    project = ProjectSerializer(read_only=True)
+    brand = UserSerializer(read_only=True)
+    creator = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Collaboration
+        fields = "__all__"

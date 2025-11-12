@@ -1,6 +1,9 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.db import models
+import uuid
+
 
 
 class User(AbstractUser):
@@ -78,7 +81,7 @@ class Notification(models.Model):
     message = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
-
+    data = models.JSONField(null=True, blank=True)  # 👈 add this
     def __str__(self):
         return f"{self.recipient.username} - {self.message}"
 
@@ -92,3 +95,28 @@ class Review(models.Model):
 
     def __str__(self):
         return f"Review by {self.reviewer.username} for {self.reviewee.username}: {self.rating} stars"
+
+
+
+
+class GuestUser(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    role = models.CharField(max_length=20, choices=[('creator', 'Creator'), ('brand', 'Brand')])
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Guest ({self.role}) - {self.id}"
+
+
+
+
+# models.py
+class Collaboration(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="collaborations")
+    brand = models.ForeignKey(User, on_delete=models.CASCADE, related_name="brand_collabs")
+    creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name="creator_collabs")
+    status = models.CharField(max_length=20, default="active")  # active / completed / pending
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.brand.username} ↔ {self.creator.username} ({self.project.title})"

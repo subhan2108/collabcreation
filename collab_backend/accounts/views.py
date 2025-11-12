@@ -5,9 +5,12 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
 from rest_framework_simplejwt.tokens import RefreshToken
-
+from .models import GuestUser
 from .models import *
 from .serializers import *
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 User = get_user_model()
 
@@ -165,19 +168,74 @@ class ApplicationListView(generics.ListAPIView):
         return Application.objects.filter(creator=user)
 
 
+
+    def post(self, request, pk):
+        try:
+            app = Application.objects.get(id=pk)
+            app.status = "hired"
+            app.save()
+
+            collab, created = Collaboration.objects.get_or_create(
+                project=app.project,
+                brand=app.project.brand,
+                creator=app.creator
+            )
+
+            Notification.objects.create(
+                recipient=app.creator,
+                message=f"🎉 Congratulations {app.creator.username}, you’ve been hired for '{app.project.title}'."
+            )
+
+            return Response({
+                "success": True,
+                "status": "hired",
+                "collaboration_id": collab.id   # ✅ important!
+            })
+
+        except Application.DoesNotExist:
+            return Response(
+                {"error": "Application not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    
+# ------------------------------------------------------
+# ✅ Step 1: Brand hires creator → collaboration created
+# ------------------------------------------------------
 class ApplicationHireView(APIView):
     def post(self, request, pk):
         try:
             app = Application.objects.get(id=pk)
             app.status = "hired"
             app.save()
+
+            # ✅ Create or get the collaboration
+            collab, created = Collaboration.objects.get_or_create(
+                project=app.project,
+                brand=app.project.brand,
+                creator=app.creator,
+                defaults={"status": "active"},  # optional
+            )
+
+            # ✅ Notify the creator
             Notification.objects.create(
                 recipient=app.creator,
-                message=f"🎉 Congratulations {app.creator.username}, you’ve been hired for '{app.project.title}'."
+                message=f"🎉 Congratulations {app.creator.username}, you’ve been hired for '{app.project.title}'.",
+                data={"collaboration_id": collab.id}
             )
-            return Response({"success": True, "status": "hired"})
+
+            return Response({
+                "success": True,
+                "status": "hired",
+                "collaboration_id": collab.id,
+                "message": "Creator hired and collaboration created successfully!"
+            }, status=status.HTTP_200_OK)
+
         except Application.DoesNotExist:
-            return Response({"error": "Application not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Application not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 class ApplicationRejectView(APIView):
@@ -294,3 +352,44 @@ class BrandProjectsView(generics.ListAPIView):
     def get_queryset(self):
         brand_user_id = self.kwargs['pk']
         return Project.objects.filter(brand_id=brand_user_id)
+
+
+class GuestRegisterView(APIView):
+    def post(self, request):
+        role = request.data.get("role")
+        if role not in ["creator", "brand"]:
+            return Response({"error": "Invalid role"}, status=status.HTTP_400_BAD_REQUEST)
+
+        guest = GuestUser.objects.create(role=role)
+        return Response({"guest_id": str(guest.id), "role": role}, status=status.HTTP_201_CREATED)
+
+
+
+class CollaborationListView(generics.ListAPIView):
+    serializer_class = CollaborationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == "brand":
+            return Collaboration.objects.filter(brand=user)
+        elif user.role == "creator":
+            return Collaboration.objects.filter(creator=user)
+        return Collaboration.objects.none()
+
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def onboarding_status(request):
+    user = request.user
+    role = user.role  # assuming User model has role field: "creator" or "brand"
+    if role == "creator":
+        completed = CreatorProfile.objects.filter(user=user).exists()
+    elif role == "brand":
+        completed = BrandProfile.objects.filter(user=user).exists()
+    else:
+        completed = False
+
+    return Response({"role": role, "completed": completed})

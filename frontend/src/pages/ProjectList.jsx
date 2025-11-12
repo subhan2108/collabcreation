@@ -7,11 +7,12 @@ const ProjectList = () => {
   const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
   useEffect(() => {
-    fetch(`${API_BASE}/projects/`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("access")}`,
-      },
-    })
+    const headers = {};
+    const accessToken = localStorage.getItem("access");
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+    fetch(`${API_BASE}/projects/`, { headers })
       .then((res) => res.json())
       .then(setProjects)
       .catch(console.error);

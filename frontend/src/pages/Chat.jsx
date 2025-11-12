@@ -13,7 +13,7 @@ export default function ChatApp() {
   const ws = useRef(null);
   const typingTimeoutRef = useRef(null);
 
- const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
+  const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
   // Load logged-in user
   useEffect(() => {
@@ -43,31 +43,33 @@ export default function ChatApp() {
     if (!currentUser || !selectedUser) return;
 
     const fetchHistory = async () => {
-  try {
-    const res = await fetch(`${BASE_URL}/chat/history/${selectedUser.id}/`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("access")}`,
-      },
-    });
+      try {
+        const res = await fetch(
+          `${BASE_URL}/chat/history/${selectedUser.id}/`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("access")}`,
+            },
+          }
+        );
 
-    if (!res.ok) throw new Error("Failed to fetch chat history");
-    const data = await res.json();
+        if (!res.ok) throw new Error("Failed to fetch chat history");
+        const data = await res.json();
 
-    setMessages(
-  data.map((msg) => ({
-    id: msg.id,
-    text: msg.message,
-    self: msg.self,  // use API-provided flag
-    sender: msg.self ? "You" : msg.sender_username,
-    edited_at: msg.edited_at,
-    is_deleted: msg.is_deleted,
-  }))
-);
-
-  } catch (err) {
-    console.error("❌ Failed to fetch chat history:", err);
-  }
-};
+        setMessages(
+          data.map((msg) => ({
+            id: msg.id,
+            text: msg.message,
+            self: msg.self, // use API-provided flag
+            sender: msg.self ? "You" : msg.sender_username,
+            edited_at: msg.edited_at,
+            is_deleted: msg.is_deleted,
+          }))
+        );
+      } catch (err) {
+        console.error("❌ Failed to fetch chat history:", err);
+      }
+    };
 
     fetchHistory();
 
@@ -85,73 +87,79 @@ export default function ChatApp() {
     };
 
     ws.current.onmessage = (e) => {
-  const data = JSON.parse(e.data);
+      const data = JSON.parse(e.data);
 
-  // Handle typing indicators
-  if (data.type === 'typing_start') {
-    setTypingUser(data.sender_username);
-    return;
-  } else if (data.type === 'typing_stop') {
-    setTypingUser(null);
-    return;
-  }
+      // Handle typing indicators
+      if (data.type === "typing_start") {
+        setTypingUser(data.sender_username);
+        return;
+      } else if (data.type === "typing_stop") {
+        setTypingUser(null);
+        return;
+      }
 
-  // Handle message edits
-  if (data.type === 'message_edited') {
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === data.message_id
-          ? { ...msg, text: data.new_message, edited_at: data.edited_at }
-          : msg
-      )
-    );
-    return;
-  }
+      // Handle message edits
+      if (data.type === "message_edited") {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === data.message_id
+              ? { ...msg, text: data.new_message, edited_at: data.edited_at }
+              : msg
+          )
+        );
+        return;
+      }
 
-  // Handle message deletions
-  if (data.type === 'message_deleted') {
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === data.message_id ? { ...msg, is_deleted: true } : msg
-      )
-    );
-    return;
-  }
+      // Handle message deletions
+      if (data.type === "message_deleted") {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === data.message_id ? { ...msg, is_deleted: true } : msg
+          )
+        );
+        return;
+      }
 
-  // Handle user status updates
-  if (data.type === 'user_online') {
-    setUsers((prev) =>
-      prev.map((user) =>
-        user.id === data.user_id ? { ...user, is_online: true } : user
-      )
-    );
-    if (selectedUser && selectedUser.id === data.user_id) {
-      setSelectedUser((prev) => ({ ...prev, is_online: true }));
-    }
-    return;
-  } else if (data.type === 'user_offline') {
-    setUsers((prev) =>
-      prev.map((user) =>
-        user.id === data.user_id ? { ...user, is_online: false } : user
-      )
-    );
-    if (selectedUser && selectedUser.id === data.user_id) {
-      setSelectedUser((prev) => ({ ...prev, is_online: false }));
-    }
-    return;
-  }
+      // Handle user status updates
+      if (data.type === "user_online") {
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.id === data.user_id ? { ...user, is_online: true } : user
+          )
+        );
+        if (selectedUser && selectedUser.id === data.user_id) {
+          setSelectedUser((prev) => ({ ...prev, is_online: true }));
+        }
+        return;
+      } else if (data.type === "user_offline") {
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.id === data.user_id ? { ...user, is_online: false } : user
+          )
+        );
+        if (selectedUser && selectedUser.id === data.user_id) {
+          setSelectedUser((prev) => ({ ...prev, is_online: false }));
+        }
+        return;
+      }
 
-  // Handle messages
-  // Ignore own messages (already added locally)
-  if (Number(data.sender_id) === Number(currentUser.id)) return;
+      // Handle messages
+      // Ignore own messages (already added locally)
+      if (Number(data.sender_id) === Number(currentUser.id)) return;
 
-  // Add incoming message to state
-  setMessages((prev) => [
-    ...prev,
-    { id: data.id, text: data.message, self: false, sender: data.sender_username, edited_at: null, is_deleted: false },
-  ]);
-};
-
+      // Add incoming message to state
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: data.id,
+          text: data.message,
+          self: false,
+          sender: data.sender_username,
+          edited_at: null,
+          is_deleted: false,
+        },
+      ]);
+    };
 
     ws.current.onclose = () => {
       console.log("❌ WebSocket disconnected");
@@ -193,7 +201,13 @@ export default function ChatApp() {
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
     }
-    ws.current.send(JSON.stringify({ type: 'typing_stop', sender_id: currentUser.id, receiver_id: selectedUser.id }));
+    ws.current.send(
+      JSON.stringify({
+        type: "typing_stop",
+        sender_id: currentUser.id,
+        receiver_id: selectedUser.id,
+      })
+    );
   };
 
   const handleKeyPress = (e) => {
@@ -203,11 +217,13 @@ export default function ChatApp() {
   const saveEdit = () => {
     if (!editInput.trim() || !editingMessage || !ws.current) return;
 
-    ws.current.send(JSON.stringify({
-      type: 'edit_message',
-      message_id: editingMessage.id,
-      new_message: editInput.trim(),
-    }));
+    ws.current.send(
+      JSON.stringify({
+        type: "edit_message",
+        message_id: editingMessage.id,
+        new_message: editInput.trim(),
+      })
+    );
 
     setEditingMessage(null);
     setEditInput("");
@@ -221,10 +237,12 @@ export default function ChatApp() {
   const deleteMessage = (messageId) => {
     if (!ws.current) return;
 
-    ws.current.send(JSON.stringify({
-      type: 'delete_message',
-      message_id: messageId,
-    }));
+    ws.current.send(
+      JSON.stringify({
+        type: "delete_message",
+        message_id: messageId,
+      })
+    );
   };
 
   return (
@@ -243,7 +261,9 @@ export default function ChatApp() {
                 <div className="name">{user.username}</div>
                 <div className="message">Click to chat</div>
               </div>
-              <div className={`status ${user.is_online ? "online" : "offline"}`}></div>
+              <div
+                className={`status ${user.is_online ? "online" : "offline"}`}
+              ></div>
             </div>
           ))}
         </div>
@@ -259,14 +279,19 @@ export default function ChatApp() {
                   </div>
                   <div>
                     <div className="username">{selectedUser.username}</div>
-                    <div className="status-text">{selectedUser.is_online ? "Online" : "Offline"}</div>
+                    <div className="status-text">
+                      {selectedUser.is_online ? "Online" : "Offline"}
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className="chat-messages">
                 {messages.map((msg, i) => (
-                  <div key={msg.id || i} className={`msg ${msg.self ? "self" : "other"} relative group`}>
+                  <div
+                    key={msg.id || i}
+                    className={`msg ${msg.self ? "self" : "other"} relative group`}
+                  >
                     <div className={`bubble ${msg.self ? "primary" : ""}`}>
                       {msg.is_deleted ? (
                         <em>Message deleted</em>
@@ -278,23 +303,23 @@ export default function ChatApp() {
                       )}
                     </div>
                     {msg.self && !msg.is_deleted && (
-                      <div className="message-actions absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-1">
+                      <div className="message-actions">
                         <button
-                          className="text-gray-400 hover:text-blue-400 transition-colors duration-200"
+                          className="edit-btn"
                           onClick={() => {
                             setEditingMessage(msg);
                             setEditInput(msg.text);
                           }}
                           title="Edit message"
                         >
-                          ✏️
+                          Edit
                         </button>
                         <button
-                          className="text-gray-400 hover:text-red-400 transition-colors duration-200"
+                          className="delete-btn"
                           onClick={() => deleteMessage(msg.id)}
                           title="Delete message"
                         >
-                          🗑️
+                          Delete
                         </button>
                       </div>
                     )}
@@ -335,8 +360,17 @@ export default function ChatApp() {
                     setInput(e.target.value);
 
                     // Send typing start
-                    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-                      ws.current.send(JSON.stringify({ type: 'typing_start', sender_id: currentUser.id, receiver_id: selectedUser.id }));
+                    if (
+                      ws.current &&
+                      ws.current.readyState === WebSocket.OPEN
+                    ) {
+                      ws.current.send(
+                        JSON.stringify({
+                          type: "typing_start",
+                          sender_id: currentUser.id,
+                          receiver_id: selectedUser.id,
+                        })
+                      );
 
                       // Clear existing timeout
                       if (typingTimeoutRef.current) {
@@ -345,7 +379,13 @@ export default function ChatApp() {
 
                       // Set timeout to stop typing after 2 seconds of inactivity
                       typingTimeoutRef.current = setTimeout(() => {
-                        ws.current.send(JSON.stringify({ type: 'typing_stop', sender_id: currentUser.id, receiver_id: selectedUser.id }));
+                        ws.current.send(
+                          JSON.stringify({
+                            type: "typing_stop",
+                            sender_id: currentUser.id,
+                            receiver_id: selectedUser.id,
+                          })
+                        );
                         typingTimeoutRef.current = null;
                       }, 2000);
                     }
