@@ -1,84 +1,88 @@
+// src/components/CreatorDashboard.jsx
 import { useEffect, useState } from "react";
-import { Bell } from "lucide-react"; // ✅ Notification icon (Lucide or use any icon lib)
+import { Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function CreatorDashboard() {
   const [profile, setProfile] = useState(null);
   const [projects, setProjects] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [unread, setUnread] = useState(false); // ✅ for red dot indicator
+  const [unread, setUnread] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [appliedProjects, setAppliedProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
 
-  const API_BASE =
-    import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+  const navigate = useNavigate();
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
   const token = localStorage.getItem("access");
 
-  // ==========================================================
-  // 📨 FETCH NOTIFICATIONS
-  // ==========================================================
-useEffect(() => {
-  const fetchNotifications = async () => {
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: token ? `Bearer ${token}` : "",
+  };
+
+  // helper to ensure brand field is object (project.brand may be id)
+  const fetchBrandIfNeeded = async (brandField) => {
+    if (!brandField) return null;
+    if (typeof brandField === "object") return brandField;
     try {
-      const res = await fetch(`${API_BASE}/notifications/`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!res.ok) throw new Error("Failed to fetch notifications");
-
+      const res = await fetch(`${API_BASE}/brands/${brandField}/`, { headers });
+      if (!res.ok) return { id: brandField, username: `brand_${brandField}` };
       const data = await res.json();
-      setNotifications(data);
-
-      // ✅ Show red dot only if there's any unread notification
-      const unreadExists = data.some((n) => !n.is_read);
-      setUnread(unreadExists);
+      return {
+        id: brandField,
+        brand_name: data.brand_name || data.user?.username || `brand_${brandField}`,
+        website: data.website_social || data.website || "",
+        description: data.description || "",
+        profile_image: data.profile_image || data.user?.profile_image || null,
+        user: data.user || null,
+      };
     } catch (err) {
-      console.error("❌ Error fetching notifications:", err);
+      console.error("Error fetching brand:", err);
+      return { id: brandField, brand_name: `brand_${brandField}` };
     }
   };
 
-  fetchNotifications();
-  // ✅ Refresh every 10 seconds to stay live
-  const interval = setInterval(fetchNotifications, 10000);
-  return () => clearInterval(interval);
-}, [API_BASE, token]);
+  // --- notifications fetch and enrichment
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/notifications/`, { headers });
+        if (!res.ok) throw new Error("Failed to fetch notifications");
+        const data = await res.json();
 
+        // if notification.data.collaboration_id is present as id, keep as-is (we navigate using it)
+        setNotifications(data);
+        const unreadExists = data.some((n) => !n.is_read);
+        setUnread(unreadExists);
+      } catch (err) {
+        console.error("❌ Error fetching notifications:", err);
+      }
+    };
 
-  // ==========================================================
-  // 🧭 FETCH DASHBOARD DATA
-  // ==========================================================
-  // ==========================================================
-  // 📝 APPLY FOR PROJECT (fixed version)
-  // ==========================================================
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 10000);
+    return () => clearInterval(interval);
+  }, [API_BASE, token]);
+
+  // apply for project
   const handleApply = async (projectId) => {
     try {
       const res = await fetch(`${API_BASE}/applications/create/`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          project: projectId,
-          pitch: "I would love to collaborate on this project!",
-        }),
+        headers,
+        body: JSON.stringify({ project: projectId, pitch: "I would love to collaborate on this project!" }),
       });
 
-      if (!res.ok) throw new Error("Failed to apply for this project");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Failed to apply");
+      }
 
-      // ✅ Instantly mark as applied
       setAppliedProjects((prev) => [...prev, projectId]);
-
-      // ✅ Optionally store in localStorage for persistence
       const updated = [...appliedProjects, projectId];
       localStorage.setItem("appliedProjects", JSON.stringify(updated));
-
       alert("✅ Applied successfully!");
     } catch (err) {
       console.error("❌ Error:", err);
@@ -86,88 +90,61 @@ useEffect(() => {
     }
   };
 
-  // ==========================================================
-  // 🧭 FETCH DASHBOARD DATA (updated for persistence)
-  // ==========================================================
+  // fetch dashboard data and enrich nested brand objects if needed
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const profileRes = await fetch(`${API_BASE}/creator-profile/`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!profileRes.ok) throw new Error(`Profile fetch failed`);
+        // PROFILE
+        const profileRes = await fetch(`${API_BASE}/creator-profile/`, { headers });
+        if (!profileRes.ok) throw new Error("Profile fetch failed");
         const profileData = await profileRes.json();
 
-        const projectsRes = await fetch(`${API_BASE}/projects/`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        // PROJECTS (may include brand as id)
+        const projectsRes = await fetch(`${API_BASE}/projects/`, { headers });
+        if (!projectsRes.ok) throw new Error("Projects fetch failed");
+        let projectsData = await projectsRes.json();
 
-        if (!projectsRes.ok) throw new Error(`Projects fetch failed`);
-        const projectsData = await projectsRes.json();
+        // enrich each project's brand if needed
+        projectsData = await Promise.all(
+          projectsData.map(async (p) => {
+            if (!p.brand) return p;
+            const brandObj = await fetchBrandIfNeeded(p.brand);
+            return { ...p, brand: brandObj };
+          })
+        );
 
-        // ✅ Load locally stored applied projects (for persistence)
-        const savedApplied =
-          JSON.parse(localStorage.getItem("appliedProjects")) || [];
+        // STORED APPLIED PROJECTS
+        const savedApplied = JSON.parse(localStorage.getItem("appliedProjects")) || [];
 
-        // ✅ Fetch applied projects from backend
-        const applicationsRes = await fetch(`${API_BASE}/applications/`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
+        // APPLICATIONS FROM BACKEND (to compute applied project ids)
+        const applicationsRes = await fetch(`${API_BASE}/applications/`, { headers });
         let appliedIds = [...savedApplied];
         if (applicationsRes.ok) {
-          const applicationsData = await applicationsRes.json();
-          appliedIds = [
-            ...new Set([
-              ...appliedIds,
-              ...applicationsData.map((app) => app.project),
-            ]),
-          ];
+          const appData = await applicationsRes.json();
+          appliedIds = [...new Set([...appliedIds, ...appData.map((a) => a.project)])];
         }
 
-        // ✅ Update profile and appliedProjects
-        setProfile({
-          ...profileData,
-          projects_applied: appliedIds.length, // dynamically update the count
-        });
-
+        setProfile({ ...profileData, projects_applied: appliedIds.length });
         setProjects(projectsData);
         setAppliedProjects(appliedIds);
       } catch (err) {
-        setError(err.message);
+        console.error("Dashboard load error:", err);
+        setError(err.message || "Failed to load dashboard");
       } finally {
         setLoading(false);
       }
     };
 
     fetchDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [API_BASE, token]);
 
   useEffect(() => {
     const fetchSummary = async () => {
       try {
-        const res = await fetch(`${API_BASE}/creator/summary/`, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
+        const res = await fetch(`${API_BASE}/creator/summary/`, { headers });
         if (!res.ok) throw new Error("Failed to fetch summary");
         const summaryData = await res.json();
-        console.log("Creator summary:", summaryData);
-
-        // ✅ Merge summary into profile (so your stats update automatically)
         setProfile((prev) => ({
           ...prev,
           projects_applied: summaryData.total_applied,
@@ -183,101 +160,55 @@ useEffect(() => {
     fetchSummary();
   }, [API_BASE, token]);
 
-  // ==========================================================
-  // 🎨 RENDER LOGIC
-  // ==========================================================
   if (loading) return <p>Loading dashboard...</p>;
   if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
   if (!profile) return <p>No profile data found.</p>;
 
   return (
     <div className="dashboard">
-      {/* === Header with Notification Icon === */}
       <header className="dashboard-header glass">
         <h1 className="section-title">Creator Dashboard</h1>
       </header>
 
-      {/* === Profile Section === */}
       <section id="creator" className="section">
         <div className="profile-card glass">
-          <img
-            src={profile.profile_image || "/default-avatar.png"}
-            alt="Profile"
-            className="profile-pic"
-          />
+          <img src={profile.profile_image || "/default-avatar.png"} alt="Profile" className="profile-pic" />
           <div>
             <h2>{profile.full_name || "Unnamed Creator"}</h2>
             <p>@{profile.username || "unknown"}</p>
-            <p>
-              <strong>Platform:</strong> {profile.primary_platform || "N/A"}
-            </p>
-            <p>
-              <strong>Followers:</strong> {profile.followers_count || 0}
-            </p>
-            {profile.bio && (
-              <p>
-                <strong>Bio:</strong> {profile.bio}
-              </p>
-            )}
+            <p><strong>Platform:</strong> {profile.primary_platform || "N/A"}</p>
+            <p><strong>Followers:</strong> {profile.followers_count || 0}</p>
+            {profile.bio && <p><strong>Bio:</strong> {profile.bio}</p>}
           </div>
         </div>
 
         <div className="stats-grid">
-          <div className="stat-card glass">
-            <p>Projects Applied</p>
-            <h2>{profile.projects_applied || 0}</h2>
-          </div>
-          <div className="stat-card glass">
-            <p>Active Projects</p>
-            <h2>{profile.active_projects || 0}</h2>
-          </div>
-          <div className="stat-card glass">
-            <p>Wallet Balance</p>
-            <h2>₹{profile.wallet_balance || 0}</h2>
-          </div>
+          <div className="stat-card glass"><p>Projects Applied</p><h2>{profile.projects_applied || 0}</h2></div>
+          <div className="stat-card glass"><p>Active Projects</p><h2>{profile.active_projects || 0}</h2></div>
+          <div className="stat-card glass"><p>Wallet Balance</p><h2>₹{profile.wallet_balance || 0}</h2></div>
         </div>
-
-        {/* === Browse Projects === */}
 
         <div className="projects-header">
           <h2>Browse Projects</h2>
-          <button
-            className="btn glass"
-            onClick={() => navigate("/projects")}
-            style={{
-              marginLeft: "auto",
-              background: "#00bfa6",
-              color: "white",
-              padding: "8px 16px",
-              borderRadius: "8px",
-              border: "none",
-              cursor: "pointer",
-              transition: "0.3s ease",
-            }}
-          >
+          <button className="btn glass" onClick={() => navigate("/projects")} style={{ marginLeft: "auto", background: "#00bfa6", color: "white", padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", transition: "0.3s ease" }}>
             See All Projects →
           </button>
         </div>
 
-        {/* === Your Projects === */}
         <div className="projects">
           <h2>Your Projects</h2>
           <div className="project-list">
             {projects.length > 0 ? (
               projects.map((p) => (
                 <div key={p.id} className="project-card glass">
-                  <div>
-                    <h3>{p.title}</h3>
-                    <p>{p.description}</p>
-                    <div className="meta">
-                      <span>💰 Budget: ₹{p.budget}</span>
-                      <span>📅 Deadline: {p.deadline}</span>
-                    </div>
+                  <h3>{p.title}</h3>
+                  <p>{p.description}</p>
+                  <div className="meta">
+                    <span>💰 Budget: ₹{p.budget}</span>
+                    <span>📅 Deadline: {p.deadline}</span>
+                    <span>🏢 Brand: {p.brand?.brand_name || p.brand?.user?.username || p.brand || "Unknown"}</span>
                   </div>
-                  <button
-                    onClick={() => handleApply(p.id)}
-                    disabled={appliedProjects.includes(p.id)}
-                  >
+                  <button disabled={appliedProjects.includes(p.id)} onClick={() => handleApply(p.id)}>
                     {appliedProjects.includes(p.id) ? "Applied" : "Apply"}
                   </button>
                 </div>
@@ -287,14 +218,9 @@ useEffect(() => {
             )}
           </div>
         </div>
+
         <div className="notification-wrapper">
-          <button
-            className="notification-btn"
-            onClick={() => {
-              setShowDropdown(!showDropdown);
-              setUnread(false); // ✅ mark as read when opened
-            }}
-          >
+          <button className="notification-btn" onClick={() => { setShowDropdown(!showDropdown); setUnread(false); }}>
             <Bell size={22} color="white" />
             {unread && <span className="notification-dot"></span>}
           </button>
@@ -302,37 +228,20 @@ useEffect(() => {
           {showDropdown && (
             <div className="notification-dropdown glass">
               <h4 className="dropdown-title">Notifications</h4>
-
-             {notifications.length > 0 ? (
-  notifications.map((n) => (
-    <div key={n.id} className="notification-item glass">
-      <p>📩 {n.message}</p>
-
-      {n.data?.collaboration_id && (
-        <button
-          className="btn glass"
-          style={{
-            marginTop: "6px",
-            background: "#00bfa6",
-            color: "white",
-            border: "none",
-            borderRadius: "6px",
-            padding: "6px 12px",
-            cursor: "pointer",
-            fontSize: "0.9rem",
-            transition: "0.3s ease",
-          }}
-          onClick={() => navigate(`/mutual/${n.data.collaboration_id}`)}
-        >
-          View Collaboration →
-        </button>
-      )}
-    </div>
-  ))
-) : (
-  <p className="empty-msg">No new notifications</p>
-)}
-
+              {notifications.length > 0 ? (
+                notifications.map((n) => (
+                  <div key={n.id} className="notification-item glass">
+                    <p>📩 {n.message}</p>
+                    {n.data?.collaboration_id && (
+                      <button className="btn glass" style={{ marginTop: "6px", background: "#00bfa6", color: "white", border: "none", borderRadius: "6px", padding: "6px 12px", cursor: "pointer", fontSize: "0.9rem", transition: "0.3s ease" }} onClick={() => navigate(`/mutual/${n.data.collaboration_id}`)}>
+                        View Collaboration →
+                      </button>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="empty-msg">No new notifications</p>
+              )}
             </div>
           )}
         </div>

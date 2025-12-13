@@ -91,3 +91,34 @@ class CollaborationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Collaboration
         fields = "__all__"
+
+
+
+class DisputeSerializer(serializers.ModelSerializer):
+    raised_by_name = serializers.CharField(source="raised_by.username", read_only=True)
+
+    class Meta:
+        model = Dispute
+        fields = [
+            "id",
+            "raised_by",
+            "raised_by_name",
+            "collaboration",
+            "reason",
+            "description",
+            "evidence",
+            "status",
+            "admin_notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["raised_by", "status", "admin_notes", "created_at", "updated_at"]
+
+
+class InviteSerializer(serializers.Serializer):
+    creator_id = serializers.IntegerField()
+    project_id = serializers.IntegerField()
+    message = serializers.CharField(allow_blank=True, required=False)
+
+class LockSerializer(serializers.Serializer):
+    is_locked = serializers.BooleanField()

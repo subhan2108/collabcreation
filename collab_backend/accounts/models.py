@@ -115,8 +115,41 @@ class Collaboration(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="collaborations")
     brand = models.ForeignKey(User, on_delete=models.CASCADE, related_name="brand_collabs")
     creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name="creator_collabs")
-    status = models.CharField(max_length=20, default="active")  # active / completed / pending
+    status = models.CharField(max_length=20, default="pending")  # overall status
+    brand_active = models.BooleanField(default=False)
+    creator_active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_locked = models.BooleanField(default=False)  # <-- NEW
+    
+    
 
     def __str__(self):
         return f"{self.brand.username} ↔ {self.creator.username} ({self.project.title})"
+    
+
+class Dispute(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("in_review", "In Review"),
+        ("resolved", "Resolved"),
+        ("rejected", "Rejected"),
+    ]
+
+    raised_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    collaboration = models.ForeignKey(Collaboration, on_delete=models.CASCADE, related_name="disputes")
+
+    reason = models.CharField(max_length=255)
+    description = models.TextField()
+    evidence = models.FileField(upload_to="disputes/", null=True, blank=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    admin_notes = models.TextField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Dispute #{self.id} - {self.status}"
+
+
+

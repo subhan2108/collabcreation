@@ -48,5 +48,14 @@ urlpatterns = [
     path("guest/register/", GuestRegisterView.as_view(), name="guest-register"),
     path('collaborations/', CollaborationListView.as_view(), name='collaboration-list'),
     path("onboarding-status/", onboarding_status),
+    path("me/", me),
+    path("collabs/<int:collab_id>/disputes/create/", CreateDispute.as_view()),
+    path("collabs/<int:collab_id>/disputes/", CollaborationDisputes.as_view()),
+    path("disputes/my/", MyDisputes.as_view()),
+    path("disputes/<int:dispute_id>/update/", UpdateDispute.as_view()),
+    # urls.py additions
+path("invite/", invite_creator, name="invite-creator"),
+path("collaborations/<int:collab_id>/lock/", lock_collaboration, name="lock-collaboration"),
+path("admin/disputes/<int:dispute_id>/respond/", admin_respond_dispute, name="admin-respond-dispute"),
 
 ]

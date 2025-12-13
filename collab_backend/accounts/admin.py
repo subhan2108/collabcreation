@@ -29,3 +29,5 @@ class BrandProfileAdmin(admin.ModelAdmin):
 
 admin.site.register(Collaboration)
 
+admin.site.register(Dispute)
+admin.site.register(Review)
