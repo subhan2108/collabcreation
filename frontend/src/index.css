@@ -2250,3 +2250,127 @@ textarea:focus {
   right: 10px;
   cursor: pointer;
 }
+
+
+
+.profile-image-wrapper {
+  position: relative;
+  cursor: pointer;
+}
+
+.profile-image-wrapper img {
+  transition: 0.3s ease;
+}
+
+.profile-image-wrapper:hover img {
+  opacity: 0.7;
+}
+
+.edit-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: #00bfa6;
+  color: white;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 50%;
+}
+
+.edit-profile-btn {
+  margin-top: 12px;
+  background: transparent;
+  border: 1px solid #00bfa6;
+  color: #00bfa6;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.edit-profile-btn:hover {
+  background: #00bfa6;
+  color: white;
+}
+
+
+
+
+.profile-pic-section {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 30px;
+}
+
+.profile-pic-uploader {
+  position: relative;
+}
+
+.profile-pic-label {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.profile-pic-large {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #00bfa6;
+}
+
+.profile-pic-label .overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  opacity: 0;
+  border-radius: 50%;
+  transition: 0.3s ease;
+}
+
+.profile-pic-label:hover .overlay {
+  opacity: 1;
+}
+
+
+
+
+.confirm-popup {
+  margin-top: 12px;
+  background: #111;
+  border: 1px solid #333;
+  padding: 12px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.confirm-popup .actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.confirm-popup .btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.confirm-popup .save {
+  background: #00bfa6;
+  color: white;
+  border: none;
+}
+
+.confirm-popup .cancel {
+  background: transparent;
+  border: 1px solid #666;
+  color: white;
+}

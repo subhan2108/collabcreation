@@ -30,8 +30,10 @@ class RegisterSerializer(serializers.ModelSerializer):
 class CreatorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = CreatorProfile
-        fields = '__all__'
-        read_only_fields = ['user']
+        fields = "__all__"
+        read_only_fields = ["user"]
+
+
 
 class BrandProfileSerializer(serializers.ModelSerializer):
     projects_count = serializers.SerializerMethodField()
@@ -122,3 +124,6 @@ class InviteSerializer(serializers.Serializer):
 
 class LockSerializer(serializers.Serializer):
     is_locked = serializers.BooleanField()
+
+
+

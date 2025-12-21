@@ -19,6 +19,7 @@ import CreatorDashboardViewer from "./pages/CreatorDashboardViewer";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import MutualPage from "./pages/MutualPage";
+import DisputeDetail from "./pages/DisputeDetail";
 
 function App() {
   return (
@@ -55,6 +56,8 @@ function App() {
         <Route path="*" element={<NotFound />} />
         <Route path="/mutual" element={<MutualPage />} />
         <Route path="/mutual/:collabId" element={<MutualPage />} />
+        <Route path="/disputes/:disputeId" element={<DisputeDetail />} />
+
       </Routes>
       <Footer />
     </div>

@@ -1,11 +1,14 @@
-// src/pages/MutualPage.jsx
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
- 
+
 export default function MutualPage() {
   const [collabs, setCollabs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const [timeLeft, setTimeLeft] = useState("");
+  const [isExpired, setIsExpired] = useState(false);
+  const [chatDisabled, setChatDisabled] = useState(false);
 
   const [selectedCollab, setSelectedCollab] = useState(null);
   const [showRatingPopup, setShowRatingPopup] = useState(false);
@@ -13,6 +16,7 @@ export default function MutualPage() {
 
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
+
   const [disputeReason, setDisputeReason] = useState("");
   const [disputeDesc, setDisputeDesc] = useState("");
   const [evidence, setEvidence] = useState(null);
@@ -24,7 +28,9 @@ export default function MutualPage() {
   const token = localStorage.getItem("access");
   const currentUserId = JSON.parse(localStorage.getItem("user"))?.id;
 
-  // Fetch collaborations
+  // --------------------------------------------------
+  // FETCH COLLABORATIONS
+  // --------------------------------------------------
   const fetchCollabs = async () => {
     try {
       const res = await fetch(`${API_BASE}/collaborations/`, {
@@ -35,7 +41,6 @@ export default function MutualPage() {
       });
 
       if (!res.ok) throw new Error("Failed to load collaborations");
-
       const data = await res.json();
       setCollabs(data);
     } catch (err) {
@@ -47,32 +52,65 @@ export default function MutualPage() {
 
   useEffect(() => {
     fetchCollabs();
-  }, [API_BASE, token]);
+  }, []);
 
-  // Mark user active
-  const activateCurrentUser = async (id) => {
-    try {
-      await fetch(`${API_BASE}/collaborations/${id}/activate_user/`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      fetchCollabs();
-    } catch (err) {
-      console.error("Activation failed:", err);
-    }
-  };
+  // --------------------------------------------------
+  // ACTIVE COLLAB
+  // --------------------------------------------------
+  const activeCollab = collabId
+    ? collabs.find((c) => String(c.id) === String(collabId))
+    : null;
 
+  // --------------------------------------------------
+  // DEADLINE TIMER
+  // --------------------------------------------------
   useEffect(() => {
-    if (collabId) activateCurrentUser(collabId);
-  }, [collabId]);
+    if (!activeCollab?.project?.deadline) return;
 
-  // ----------------------------
-  // submit review + auto-lock
-  // ----------------------------
-  const handleSubmitReview = async (selectedCollabObj, theRating, theReviewText) => {
+    const deadline = new Date(activeCollab.project.deadline + "T23:59:59");
+
+    const timer = setInterval(() => {
+      const now = new Date();
+      const diff = deadline - now;
+
+      if (diff <= 0) {
+        clearInterval(timer);
+        setIsExpired(true);
+        setTimeLeft("00:00:00");
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+
+      setTimeLeft(
+        `${days}d ${hours.toString().padStart(2, "0")}:${minutes
+          .toString()
+          .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
+      );
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [activeCollab]);
+
+  // --------------------------------------------------
+  // AUTO LOCK + FORCE RATING
+  // --------------------------------------------------
+  useEffect(() => {
+    if (isExpired) {
+      setChatDisabled(true);
+      setShowRatingPopup(true);
+    }
+  }, [isExpired]);
+
+  // --------------------------------------------------
+  // SUBMIT REVIEW
+  // --------------------------------------------------
+  const handleSubmitReview = async () => {
+    if (!rating) return alert("Please give a rating");
+
     try {
       const res = await fetch(`${API_BASE}/reviews/`, {
         method: "POST",
@@ -81,150 +119,102 @@ export default function MutualPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          reviewee: selectedCollabObj.otherUserId,
-          rating: theRating,
-          review_text: theReviewText,
-          collaboration: selectedCollabObj.id,
+          reviewee:
+            currentUserId === activeCollab.brand.id
+              ? activeCollab.creator.id
+              : activeCollab.brand.id,
+          rating,
+          review_text: reviewText,
+          project: activeCollab.project.id,
         }),
       });
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(()=>null);
-        console.error("Review submission failed:", errJson || res.statusText);
-        alert("Failed to submit review");
-        return;
-      }
+      if (!res.ok) throw new Error("Review failed");
+
+      // lock collaboration
+      await fetch(`${API_BASE}/collaborations/${activeCollab.id}/lock/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ is_locked: true }),
+      });
 
       alert("Review submitted!");
-
-      // Immediately try to lock collaboration (backend must support this route)
-      try {
-        const lockRes = await fetch(`${API_BASE}/collaborations/${selectedCollabObj.id}/lock/`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ is_locked: true }),
-        });
-
-        if (!lockRes.ok) {
-          // not fatal — just warn
-          console.warn("Could not lock collaboration automatically. Admin may lock later.");
-        } else {
-          // refresh UI to reflect lock
-          await fetchCollabs();
-        }
-      } catch (err) {
-        console.error("Lock call failed:", err);
-      }
-
-      // close + reset
       setShowRatingPopup(false);
-      setRating(0);
-      setReviewText("");
+      fetchCollabs();
     } catch (err) {
-      console.error("Review submit error:", err);
-      alert("Failed to submit review (network).");
+      alert("Failed to submit review");
     }
   };
 
-  if (loading) return <p>Loading collaborations...</p>;
-  if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
+  // --------------------------------------------------
+  // LOADING / ERROR
+  // --------------------------------------------------
+  if (loading) return <p>Loading collaboration...</p>;
+  if (error) return <p style={{ color: "red" }}>{error}</p>;
+  if (!activeCollab) return <p>No collaboration found.</p>;
 
-  const filteredCollabs = collabId
-    ? collabs.filter((c) => String(c.id) === String(collabId))
-    : collabs;
+  const otherUserId =
+    currentUserId === activeCollab.brand.id
+      ? activeCollab.creator.id
+      : activeCollab.brand.id;
 
-  if (filteredCollabs.length === 0) {
-    return (
-      <div className="mutual-page glass">
-        <h1 className="section-title">🤝 Collaborations</h1>
-        <p>No collaborations found.</p>
-      </div>
-    );
-  }
-
+  // --------------------------------------------------
+  // UI
+  // --------------------------------------------------
   return (
     <div className="mutual-page glass">
-      <h1 className="section-title">🤝 Collaborations</h1>
+      <h1 className="section-title">🤝 Collaboration</h1>
 
-      <div className="collab-list">
-        {filteredCollabs.map((c) => {
-          const otherUserId =
-            currentUserId === c.brand?.id ? c.creator?.id : c.brand?.id;
-
-          return (
-            <div key={c.id} className="collab-card glass">
-              <div className="collab-header">
-                <h2>{c.project?.title || "Untitled Project"}</h2>
-              </div>
-
-              <div className="collab-body">
-                <div className="collab-user">
-                  <h3>👔 Brand</h3>
-                  <p>{c.brand?.username}</p>
-                </div>
-
-                <div className="collab-user">
-                  <h3>🎨 Creator</h3>
-                  <p>{c.creator?.username}</p>
-                </div>
-              </div>
-
-              <div className="collab-footer">
-                {c.is_locked ? (
-                  <div className="muted">
-                    <p><strong>Collaboration closed (locked)</strong></p>
-                    <button className="btn-outline" onClick={() => navigate(`/chat/${c.id}`)} disabled>
-                      💬 Open Chat
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <button className="btn glass" onClick={() => navigate(`/chat/${c.id}`)}>💬 Open Chat</button>
-
-                    <button
-                      className="btn glass"
-                      onClick={() => {
-                        setSelectedCollab({ ...c, otherUserId });
-                        setShowRatingPopup(true);
-                      }}
-                    >
-                      ⭐ Rate User
-                    </button>
-
-                    <button
-                      className="btn-outline glass"
-                      onClick={() => {
-                        setSelectedCollab(c);
-                        setShowDisputePopup(true);
-                      }}
-                    >
-                      ⚖ Raise Dispute
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
+      <div className={`deadline-timer ${isExpired ? "expired" : ""}`}>
+        {isExpired ? "⛔ Deadline Ended" : `⏳ Time Left: ${timeLeft}`}
       </div>
 
-      {/* --------------------------------------
-          ⭐ RATING POPUP
-      -------------------------------------- */}
-      {showRatingPopup && selectedCollab && (
+      <div className="collab-card glass">
+        <h2>{activeCollab.project.title}</h2>
+
+        <p>👔 Brand: {activeCollab.brand.username}</p>
+        <p>🎨 Creator: {activeCollab.creator.username}</p>
+
+        <div className="collab-actions">
+          <button
+            className="btn glass"
+            onClick={() => navigate(`/chat/${otherUserId}`)}
+            disabled={chatDisabled || activeCollab.is_locked}
+          >
+            💬 Open Chat
+          </button>
+
+          <button
+            className="btn glass"
+            onClick={() => setShowRatingPopup(true)}
+          >
+            ⭐ Rate User
+          </button>
+
+          <button
+            className="btn-outline"
+            onClick={() => setShowDisputePopup(true)}
+          >
+            ⚖ Raise Dispute
+          </button>
+        </div>
+      </div>
+
+      {/* ---------------- RATING POPUP ---------------- */}
+      {showRatingPopup && (
         <div className="modal-overlay">
           <div className="modal glass">
             <h2>⭐ Rate Collaboration</h2>
 
             <div className="stars">
-              {[1,2,3,4,5].map(star => (
+              {[1, 2, 3, 4, 5].map((s) => (
                 <span
-                  key={star}
-                  className={`star ${rating >= star ? "active" : ""}`}
-                  onClick={() => setRating(star)}
+                  key={s}
+                  className={rating >= s ? "star active" : "star"}
+                  onClick={() => setRating(s)}
                 >
                   ★
                 </span>
@@ -232,111 +222,74 @@ export default function MutualPage() {
             </div>
 
             <textarea
-              placeholder="Write review..."
+              placeholder="Write a review..."
               value={reviewText}
               onChange={(e) => setReviewText(e.target.value)}
             />
 
-            <button
-              className="btn-primary"
-              onClick={() => handleSubmitReview(selectedCollab, rating, reviewText)}
-            >
+            <button className="btn-primary" onClick={handleSubmitReview}>
               Submit Review
-            </button>
-
-            <button
-              className="btn-outline"
-              onClick={() => setShowRatingPopup(false)}
-            >
-              Close
             </button>
           </div>
         </div>
       )}
 
-      {/* --------------------------------------
-          ⚖ DISPUTE POPUP
-      -------------------------------------- */}
-      {showDisputePopup && selectedCollab && (
+      {/* ---------------- DISPUTE POPUP ---------------- */}
+      {showDisputePopup && (
         <div className="modal-overlay">
           <div className="modal glass">
+            <h2>⚖ Raise Dispute</h2>
 
-            <h2>⚖ Raise a Dispute</h2>
-
-            <select 
+            <select
               value={disputeReason}
-              onChange={(e)=>setDisputeReason(e.target.value)}
+              onChange={(e) => setDisputeReason(e.target.value)}
             >
-              <option value="">Select Reason</option>
+              <option value="">Select reason</option>
               <option value="Payment Issue">Payment Issue</option>
-              <option value="Work Quality">Work Quality</option>
+              <option value="Quality Issue">Quality Issue</option>
               <option value="Deadline Missed">Deadline Missed</option>
               <option value="Other">Other</option>
             </select>
 
             <textarea
-              placeholder="Describe the issue..."
+              placeholder="Describe the issue"
               value={disputeDesc}
-              onChange={(e)=>setDisputeDesc(e.target.value)}
+              onChange={(e) => setDisputeDesc(e.target.value)}
             />
 
-            <input 
-              type="file"
-              onChange={(e)=>setEvidence(e.target.files[0])}
-            />
+            <input type="file" onChange={(e) => setEvidence(e.target.files[0])} />
 
             <button
               className="btn-primary"
               onClick={async () => {
                 if (!disputeReason || !disputeDesc)
-                  return alert("Fill all fields!");
+                  return alert("Fill all fields");
 
-                const formData = new FormData();
-                formData.append("reason", disputeReason);
-                formData.append("description", disputeDesc);
-                if (evidence) formData.append("evidence", evidence);
+                const fd = new FormData();
+                fd.append("reason", disputeReason);
+                fd.append("description", disputeDesc);
+                if (evidence) fd.append("evidence", evidence);
 
-                const res = await fetch(
-                  `${API_BASE}/collabs/${selectedCollab.id}/disputes/create/`,
+                await fetch(
+                  `${API_BASE}/collabs/${activeCollab.id}/disputes/create/`,
                   {
                     method: "POST",
                     headers: {
                       Authorization: `Bearer ${token}`,
                     },
-                    body: formData,
+                    body: fd,
                   }
                 );
 
-                if (res.ok) {
-                  alert("Dispute submitted!");
-                  setShowDisputePopup(false);
-                  setDisputeReason("");
-                  setDisputeDesc("");
-                  setEvidence(null);
-
-                  // optionally refresh the list so admin-made actions can be seen
-                  fetchCollabs();
-                } else {
-                  const err = await res.json().catch(()=>null);
-                  console.error("Dispute error:", err || res.status);
-                  alert("Failed to submit dispute");
-                }
+                alert("Dispute submitted");
+                setShowDisputePopup(false);
               }}
             >
               Submit Dispute
             </button>
-
-            <button
-              className="btn-outline"
-              onClick={() => setShowDisputePopup(false)}
-            >
-              Close
-            </button>
-
           </div>
         </div>
       )}
-
     </div>
   );
 }

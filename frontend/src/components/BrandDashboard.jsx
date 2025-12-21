@@ -1,5 +1,7 @@
 // src/components/BrandDashboard.jsx
 import { useEffect, useState } from "react";
+import Notification from "./Notification";
+
 
 export default function BrandDashboard() {
   const [profile, setProfile] = useState(null);
@@ -247,6 +249,8 @@ export default function BrandDashboard() {
             <p>No applications yet.</p>
           )}
         </div>
+
+        <Notification />
       </section>
     </div>
   );

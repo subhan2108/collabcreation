@@ -12,6 +12,8 @@ from chat.models import ChatMessage
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+import cloudinary.uploader
+
 
 User = get_user_model()
 
@@ -446,10 +448,7 @@ class CreateDispute(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, collab_id):
-        try:
-            collab = Collaboration.objects.get(id=collab_id)
-        except Collaboration.DoesNotExist:
-            return Response({"error": "Collaboration not found"}, status=404)
+        collab = get_object_or_404(Collaboration, id=collab_id)
 
         reason = request.data.get("reason")
         desc = request.data.get("description")
@@ -466,7 +465,26 @@ class CreateDispute(APIView):
             evidence=evidence
         )
 
-        return Response(DisputeSerializer(dispute, context={"request": request}).data, status=201)
+        # 👇 FIND OTHER USER
+        other_user = (
+            collab.creator if request.user == collab.brand else collab.brand
+        )
+
+        # 🔔 CREATE NOTIFICATION
+        Notification.objects.create(
+            recipient=other_user,
+            message="⚠️ A dispute has been raised on your collaboration",
+            data={
+                "type": "dispute",
+                "dispute_id": dispute.id,
+                "collaboration_id": collab.id
+            }
+        )
+
+        return Response(
+            DisputeSerializer(dispute, context={"request": request}).data,
+            status=201
+        )
 
 class CollaborationDisputes(APIView):
     permission_classes = [IsAuthenticated]
@@ -534,7 +552,16 @@ def invite_creator(request):
 
     # Optional: create an 'invited' application or just notify + chat message
     ChatMessage.objects.create(sender=request.user, receiver=creator, message=message or f"{request.user.username} invited you to collaborate on '{project.title}'")
-    Notification.objects.create(recipient=creator, message=f"{request.user.username} invited you to collaborate on '{project.title}'", data={"project_id": project.id, "invited_by": request.user.id})
+    Notification.objects.create(
+    recipient=creator,
+    message=f"{request.user.username} invited you to collaborate on '{project.title}'",
+    data={
+        "type": "collaboration_invite",
+        "project_id": project.id,
+        "brand_id": request.user.id
+    }
+)
+
 
     # Optional: create an Application record with status 'invited'
     try:
@@ -600,3 +627,110 @@ def admin_respond_dispute(request, dispute_id):
 
     return Response({"success": True, "dispute": DisputeSerializer(dispute).data})
 
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def accept_invite(request):
+    project_id = request.data.get("project_id")
+    brand_id = request.data.get("brand_id")
+
+    project = get_object_or_404(Project, id=project_id)
+    brand = get_object_or_404(User, id=brand_id)
+
+    # create collaboration
+    collab, _ = Collaboration.objects.get_or_create(
+        project=project,
+        brand=brand,
+        creator=request.user,
+        defaults={"status": "active"}
+    )
+
+    # notify brand
+    Notification.objects.create(
+        recipient=brand,
+        message=f"{request.user.username} accepted your invitation",
+        data={"collaboration_id": collab.id}
+    )
+
+    return Response({
+        "success": True,
+        "collaboration_id": collab.id
+    })
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def ignore_invite(request):
+    return Response({"success": True})
+
+
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def mark_notifications_read(request):
+    Notification.objects.filter(
+        recipient=request.user,
+        is_read=False
+    ).update(is_read=True)
+
+    return Response({"success": True})
+
+
+
+# views.py
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dispute_detail(request, dispute_id):
+    dispute = get_object_or_404(Dispute, id=dispute_id)
+
+    # Only involved users or admin can view
+    collab = dispute.collaboration
+    if not (
+        request.user == collab.brand or
+        request.user == collab.creator or
+        request.user.is_staff
+    ):
+        return Response({"error": "Not allowed"}, status=403)
+
+    return Response(
+        DisputeSerializer(dispute, context={"request": request}).data
+    )
+
+
+
+class CreatorProfileImageUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        profile = request.user.creatorprofile
+
+        print("🟡 [PATCH image] BEFORE upload DB value:", profile.profile_image)
+
+        image = request.FILES.get("profile_image")
+        if not image:
+            print("🔴 [PATCH image] No image received")
+            return Response(
+                {"error": "No image file received"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Upload to Cloudinary
+        result = cloudinary.uploader.upload(
+            image,
+            folder="creator_profiles"
+        )
+
+        cloudinary_url = result.get("secure_url")
+        print("🟢 [PATCH image] Cloudinary returned URL:", cloudinary_url)
+
+        # Save URL in DB
+        profile.profile_image = cloudinary_url
+        profile.save(update_fields=["profile_image"])
+
+        print("🟢 [PATCH image] AFTER save DB value:", profile.profile_image)
+
+        return Response(
+            {"profile_image": cloudinary_url},
+            status=status.HTTP_200_OK
+        )

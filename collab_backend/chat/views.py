@@ -43,7 +43,6 @@ def user_list(request):
     return JsonResponse(users, safe=False)
 
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def chat_history(request, user_id):
@@ -51,25 +50,29 @@ def chat_history(request, user_id):
 
     messages_qs = ChatMessage.objects.filter(
         Q(sender=request.user, receiver=selected_user) |
-        Q(sender=selected_user, receiver=request.user)
-    ).order_by('timestamp')
+        Q(sender=selected_user, receiver=request.user) |
+        Q(is_system=True, receiver=request.user)
+    ).order_by("created_at")
 
     data = [
         {
             "id": msg.id,
-            "sender_id": msg.sender.id,
-            "sender_username": msg.sender.username,
-            "receiver_id": msg.receiver.id,
-            "receiver_username": msg.receiver.username,
             "message": msg.message,
-            "self": msg.sender.id == request.user.id,  # <-- IMPORTANT
-            "timestamp": msg.timestamp.isoformat(),
+            "sender_username": (
+                "Team CollabCreation"
+                if msg.is_system
+                else msg.sender.username
+            ),
+            "self": (msg.sender == request.user) if msg.sender else False,
+            "is_system": msg.is_system,
             "edited_at": msg.edited_at.isoformat() if msg.edited_at else None,
             "is_deleted": msg.is_deleted,
         }
         for msg in messages_qs
     ]
-    return JsonResponse(data, safe=False)
+
+    return Response(data)
+
 
 
 @api_view(['PUT'])

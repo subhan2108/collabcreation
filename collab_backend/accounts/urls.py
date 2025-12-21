@@ -57,5 +57,19 @@ urlpatterns = [
 path("invite/", invite_creator, name="invite-creator"),
 path("collaborations/<int:collab_id>/lock/", lock_collaboration, name="lock-collaboration"),
 path("admin/disputes/<int:dispute_id>/respond/", admin_respond_dispute, name="admin-respond-dispute"),
+path("my-projects/", MyProjectListView.as_view(), name="my-projects"),
+path("notifications/mark-read/", mark_notifications_read, name="notifications-mark-read"),
+path("invites/accept/", accept_invite),
+path("invites/ignore/", ignore_invite),
+path("disputes/<int:dispute_id>/", dispute_detail),
+
+path(
+    "creator-profile/image/",
+    CreatorProfileImageUpdateView.as_view(),
+    name="creator-profile-image"
+),
+
+
+
 
 ]

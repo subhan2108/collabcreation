@@ -3,11 +3,11 @@ import { useParams } from "react-router-dom";
 
 export default function CreatorDashboardViewer() {
   const { id } = useParams(); // creator ID
-  const [profile, setProfile] = useState(null);
 
-  const [projects, setProjects] = useState([]); // all public projects
-  const [myProjects, setMyProjects] = useState([]); // logged-in brand-owned projects
-  const [invitedProjects, setInvitedProjects] = useState([]); // store project IDs already invited
+  const [profile, setProfile] = useState(null);
+  const [projects, setProjects] = useState([]);        // public projects
+  const [myProjects, setMyProjects] = useState([]);    // brand-owned projects
+  const [invitedProjects, setInvitedProjects] = useState([]); // project IDs already invited
 
   const [showInvitePopup, setShowInvitePopup] = useState(false);
   const [selectedProject, setSelectedProject] = useState("");
@@ -18,49 +18,47 @@ export default function CreatorDashboardViewer() {
 
   const API_BASE = import.meta.env.VITE_API_BASE_URL;
   const token = localStorage.getItem("access");
-  const loggedUser = JSON.parse(localStorage.getItem("user")); // logged brand
 
-  // ---------------------------
+  // ----------------------------------------------------
   // LOAD ALL DATA
-  // ---------------------------
+  // ----------------------------------------------------
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1️⃣ Fetch creator profile
+        /* ---------------------------
+           1️⃣ Fetch creator profile
+        --------------------------- */
         const profileRes = await fetch(`${API_BASE}/creators/${id}/`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
 
         if (!profileRes.ok) throw new Error("Creator profile fetch failed");
-
         const profileData = await profileRes.json();
         setProfile(profileData);
 
-        // 2️⃣ Fetch all public projects
+        /* ---------------------------
+           2️⃣ Fetch ALL public projects
+        --------------------------- */
         const projectsRes = await fetch(`${API_BASE}/projects/`);
+        if (!projectsRes.ok) throw new Error("Projects fetch failed");
         const allProjects = await projectsRes.json();
         setProjects(allProjects);
 
-        // 3️⃣ Fetch ONLY logged-in brand projects
-        if (loggedUser?.id) {
-          const myProjRes = await fetch(
-            `${API_BASE}/brands/${loggedUser.id}/projects/`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
+        /* ---------------------------
+           3️⃣ Fetch ONLY logged-in brand projects
+        --------------------------- */
+        const myProjRes = await fetch(`${API_BASE}/my-projects/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-          if (myProjRes.ok) {
-            const myData = await myProjRes.json();
-            setMyProjects(myData);
-          }
+        if (myProjRes.ok) {
+          const myData = await myProjRes.json();
+          setMyProjects(myData);
         }
 
-        // 4️⃣ Fetch invitation history (check which projects this creator was invited to)
+        /* ---------------------------
+           4️⃣ Fetch invitation history
+        --------------------------- */
         const invitesRes = await fetch(`${API_BASE}/applications/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -68,12 +66,16 @@ export default function CreatorDashboardViewer() {
         if (invitesRes.ok) {
           const invites = await invitesRes.json();
           const alreadyInvited = invites
-            .filter((app) => app.creator?.id == id)
-            .map((app) => app.project);
+            .filter(
+              (app) =>
+                app.creator?.id == id &&
+                app.project &&
+                app.project.id
+            )
+            .map((app) => app.project.id);
 
           setInvitedProjects(alreadyInvited);
         }
-
       } catch (err) {
         console.error(err);
         setError(err.message);
@@ -83,11 +85,11 @@ export default function CreatorDashboardViewer() {
     };
 
     fetchData();
-  }, [id, API_BASE, token, loggedUser?.id]);
+  }, [id, API_BASE, token]);
 
-  // ---------------------------
+  // ----------------------------------------------------
   // SEND INVITATION
-  // ---------------------------
+  // ----------------------------------------------------
   const sendInvitation = async () => {
     if (!selectedProject) return alert("Select a project first!");
 
@@ -106,10 +108,7 @@ export default function CreatorDashboardViewer() {
 
     if (res.ok) {
       alert("Invitation sent successfully!");
-
-      // prevent duplicate invites
       setInvitedProjects((prev) => [...prev, Number(selectedProject)]);
-
       setShowInvitePopup(false);
       setSelectedProject("");
       setInviteMessage("");
@@ -118,19 +117,19 @@ export default function CreatorDashboardViewer() {
     }
   };
 
-  // ---------------------------
-  // UI RENDERING
-  // ---------------------------
+  // ----------------------------------------------------
+  // UI RENDER
+  // ----------------------------------------------------
   if (loading) return <p>Loading creator details...</p>;
   if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
   if (!profile) return <p>No profile found.</p>;
 
   return (
     <div className="dashboard">
-      <section id="creator" className="section">
+      <section className="section">
         <h1 className="section-title">Creator Profile</h1>
 
-        {/* PROFILE */}
+        {/* ================= PROFILE ================= */}
         <div className="profile-card glass">
           <img
             src={profile.profile_image || "/default-avatar.png"}
@@ -141,7 +140,6 @@ export default function CreatorDashboardViewer() {
           <div>
             <h2>{profile.full_name || profile.username}</h2>
             <p>@{profile.username}</p>
-
             <p><strong>Platform:</strong> {profile.primary_platform}</p>
             <p><strong>Followers:</strong> {profile.followers_count}</p>
 
@@ -156,26 +154,30 @@ export default function CreatorDashboardViewer() {
           </div>
         </div>
 
-        {/* PROJECT LIST */}
+        {/* ================= PROJECTS ================= */}
         <div className="projects">
           <h2>Projects</h2>
 
           <div className="project-list">
-            {projects.map((p) => (
-              <div key={p.id} className="project-card glass">
-                <h3>{p.title}</h3>
-                <p>{p.description}</p>
-                <div className="meta">
-                  <span>💰 ₹{p.budget}</span>
-                  <span>📅 {p.deadline}</span>
+            {projects.length > 0 ? (
+              projects.map((p) => (
+                <div key={p.id} className="project-card glass">
+                  <h3>{p.title}</h3>
+                  <p>{p.description}</p>
+                  <div className="meta">
+                    <span>💰 ₹{p.budget}</span>
+                    <span>📅 {p.deadline}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p>No projects available.</p>
+            )}
           </div>
         </div>
       </section>
 
-      {/* INVITE POPUP */}
+      {/* ================= INVITE POPUP ================= */}
       {showInvitePopup && (
         <div className="modal-overlay">
           <div className="modal glass">
@@ -185,11 +187,20 @@ export default function CreatorDashboardViewer() {
               value={selectedProject}
               onChange={(e) => setSelectedProject(e.target.value)}
             >
-              <option value="">Select a project</option>
+              <option value="">Select your project</option>
+
+              {myProjects.length === 0 && (
+                <option disabled>No projects found</option>
+              )}
 
               {myProjects.map((p) => (
-                <option key={p.id} value={p.id} disabled={invitedProjects.includes(p.id)}>
-                  {p.title} {invitedProjects.includes(p.id) ? " (Invited)" : ""}
+                <option
+                  key={p.id}
+                  value={p.id}
+                  disabled={invitedProjects.includes(p.id)}
+                >
+                  {p.title}
+                  {invitedProjects.includes(p.id) ? " (Invited)" : ""}
                 </option>
               ))}
             </select>
