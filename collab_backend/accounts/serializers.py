@@ -127,3 +127,26 @@ class LockSerializer(serializers.Serializer):
 
 
 
+class CreatorProjectViewSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
+    collaboration_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Project
+        fields = ["id", "title", "description", "budget", "status", "collaboration_id"]
+
+    def get_status(self, project):
+        user = self.context["request"].user
+        app = Application.objects.filter(
+            project=project,
+            creator=user
+        ).first()
+        return app.status if app else None
+
+    def get_collaboration_id(self, project):
+        user = self.context["request"].user
+        collab = Collaboration.objects.filter(
+            project=project,
+            creator=user
+        ).first()
+        return collab.id if collab else None

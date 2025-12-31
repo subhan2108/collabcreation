@@ -1,0 +1,157 @@
+.projects-page {
+  padding: 24px;
+  max-width: 1000px;
+  margin: auto;
+}
+
+.projects-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.project-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #eee;
+}
+
+.project-card h4 {
+  margin-bottom: 6px;
+}
+
+.muted {
+  color: #666;
+  font-size: 14px;
+}
+
+.budget {
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+
+.btn.primary {
+  background: #2563eb;
+  color: white;
+}
+
+.btn.applied {
+  background: #e5e7eb;
+  color: #555;
+  cursor: not-allowed;
+}
+
+.back-dashboard {
+  display: inline-block;
+  margin-top: 20px;
+  color: #2563eb;
+  text-decoration: none;
+}
+.projects-page {
+  padding: 24px;
+  max-width: 1000px;
+  margin: auto;
+}
+
+.projects-page h2 {
+  margin-bottom: 12px;
+}
+
+.projects-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.project-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.project-info h4 {
+  margin-bottom: 6px;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.budget {
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.project-action {
+  min-width: 180px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+
+.btn.primary {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-block;
+  text-align: center;
+}
+
+.badge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge.hired {
+  background: #dcfce7;
+  color: #166534;
+  text-decoration: none;
+}
+
+.badge.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.back-dashboard {
+  display: inline-block;
+  margin-top: 20px;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.page-msg {
+  padding: 24px;
+}
+
+.page-msg.error {
+  color: red;
+}

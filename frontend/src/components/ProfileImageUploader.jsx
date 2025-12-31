@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import Cropper from "react-easy-crop";
+import "./Dashboard.css"
+
 
 export default function ProfileImageUploader({ image, onUpdated = () => {} }) {
   const API_ROOT =
@@ -11,6 +14,48 @@ export default function ProfileImageUploader({ image, onUpdated = () => {} }) {
   const [preview, setPreview] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+const [zoom, setZoom] = useState(1);
+const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
+
+
+const createImage = (url) =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.crossOrigin = "anonymous";
+    image.src = url;
+  });
+
+async function getCroppedImg(imageSrc, crop) {
+  const image = await createImage(imageSrc);
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = crop.width;
+  canvas.height = crop.height;
+
+  ctx.drawImage(
+    image,
+    crop.x,
+    crop.y,
+    crop.width,
+    crop.height,
+    0,
+    0,
+    crop.width,
+    crop.height
+  );
+
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      resolve(new File([blob], "profile.jpg", { type: "image/jpeg" }));
+    }, "image/jpeg");
+  });
+}
+
   
 
   // 🔑 when parent updates image, clear preview safely
@@ -32,38 +77,39 @@ export default function ProfileImageUploader({ image, onUpdated = () => {} }) {
   };
 
   const handleSave = async () => {
-  if (!selectedFile) return;
-
-  const formData = new FormData();
-  formData.append("profile_image", selectedFile);
+  if (!preview || !croppedAreaPixels) return;
 
   try {
     setUploading(true);
 
-    const res = await fetch(
-  `${API_ROOT}/api/creator-profile/image/`,
-  {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
-  }
-);
+    const croppedFile = await getCroppedImg(
+      preview,
+      croppedAreaPixels
+    );
 
-const data = await res.json();
+    const formData = new FormData();
+    formData.append("profile_image", croppedFile);
 
-// Cloudinary URL – use directly
-onUpdated(data.profile_image);
-console.log("🟢 IMAGE UPLOADED URL:", data.profile_image);
+    const res = await fetch(`${API_ROOT}/api/creator-profile/image/`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
 
+    const data = await res.json();
 
-  } catch (err) {
+    onUpdated(data.profile_image);
+    setPreview(null);
+    setShowConfirm(false);
+  } catch {
     alert("❌ Failed to save image");
   } finally {
     setUploading(false);
   }
 };
+
 
 
   const handleDiscard = () => {
@@ -75,11 +121,28 @@ console.log("🟢 IMAGE UPLOADED URL:", data.profile_image);
   return (
     <div className="profile-pic-uploader">
       <label className="profile-pic-label">
-        <img
-          src={preview || image || "/default-avatar.png"}
-          alt="Profile"
-          className="profile-pic-large"
-        />
+        {preview ? (
+  <div className="cropper-wrapper">
+    <Cropper
+      image={preview}
+      crop={crop}
+      zoom={zoom}
+      aspect={1}
+      onCropChange={setCrop}
+      onZoomChange={setZoom}
+      onCropComplete={(_, croppedPixels) =>
+        setCroppedAreaPixels(croppedPixels)
+      }
+    />
+  </div>
+) : (
+  <img
+    src={image || "/default-avatar.png"}
+    className="profile-pic-circle"
+    alt="Profile"
+  />
+)}
+
 
         <input
           type="file"

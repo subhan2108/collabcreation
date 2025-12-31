@@ -1,312 +1,309 @@
 // src/components/CreatorDashboard.jsx
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Notification from "./Notification";
 import EditProfileModal from "./EditProfileModal";
 import ProfileImageUploader from "./ProfileImageUploader";
 
 
 export default function CreatorDashboard() {
-  const [profile, setProfile] = useState(null);
-  const [projects, setProjects] = useState([]);
-  const [appliedProjects, setAppliedProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [showEdit, setShowEdit] = useState(false);
-
-
-  const navigate = useNavigate();
   const API_BASE =
     import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
   const token = localStorage.getItem("access");
+  const navigate = useNavigate();
 
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: token ? `Bearer ${token}` : "",
+  /* ===================== STATE ===================== */
+  const [profile, setProfile] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [appliedProjectIds, setAppliedProjectIds] = useState([]);
+  const [stats, setStats] = useState({
+    applied: 0,
+    pending: 0,
+    hired: 0,
+    rejected: 0,
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+
+  /* ===================== AUTH GUARD ===================== */
+  useEffect(() => {
+    if (!token) navigate("/login");
+  }, [token, navigate]);
+
+  const authHeaders = {
+    Authorization: `Bearer ${token}`,
   };
 
-  // helper to ensure brand field is object (project.brand may be id)
-  const fetchBrandIfNeeded = async (brandField) => {
-    if (!brandField) return null;
-    if (typeof brandField === "object") return brandField;
+  /* ===================== FETCH DASHBOARD ===================== */
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        /* PROFILE */
+        const profileRes = await fetch(`${API_BASE}/creator-profile/`, {
+          headers: authHeaders,
+        });
+        if (profileRes.status === 401) return navigate("/login");
+        if (!profileRes.ok) throw new Error("Profile fetch failed");
+        const profileData = await profileRes.json();
+
+        /* APPLICATIONS */
+        const appsRes = await fetch(`${API_BASE}/applications/`, {
+          headers: authHeaders,
+        });
+        const appsData = appsRes.ok ? await appsRes.json() : [];
+        /* CREATOR PROJECT VIEW (STATUS BADGES SOURCE) */
+const projectRes = await fetch(`${API_BASE}/projects/creator-view/`, {
+  headers: authHeaders,
+});
+const projectData = projectRes.ok ? await projectRes.json() : [];
+setProjects(projectData);
+
+
+        setProfile(profileData);
+        setApplications(appsData);
+        setAppliedProjectIds(appsData.map((a) => a.project));
+
+        /* STATS */
+        const statsRes = await fetch(`${API_BASE}/creator/stats/`, {
+          headers: authHeaders,
+        });
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          setStats(statsData);
+        }
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load dashboard");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboard();
+  }, [API_BASE, navigate, token]);
+
+   const fetchProjects = async () => {
     try {
-      const res = await fetch(`${API_BASE}/brands/${brandField}/`, { headers });
-      if (!res.ok) return { id: brandField, username: `brand_${brandField}` };
+      setLoading(true);
+
+      const res = await fetch(`${API_BASE}/projects/creator-view/`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) throw new Error("Failed to load projects");
+
       const data = await res.json();
-      return {
-        id: brandField,
-        brand_name:
-          data.brand_name || data.user?.username || `brand_${brandField}`,
-        website: data.website_social || data.website || "",
-        description: data.description || "",
-        profile_image: data.profile_image || data.user?.profile_image || null,
-        user: data.user || null,
-      };
+      setProjects(data);
     } catch (err) {
-      console.error("Error fetching brand:", err);
-      return { id: brandField, brand_name: `brand_${brandField}` };
+      console.error(err);
+      setError("Failed to load projects");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // apply for project
+  useEffect(() => {
+    fetchProjects();
+  }, [API_BASE, token]);
+
+  /* ===================== APPLY ===================== */
   const handleApply = async (projectId) => {
     try {
       const res = await fetch(`${API_BASE}/applications/create/`, {
         method: "POST",
-        headers,
+        headers: {
+          ...authHeaders,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           project: projectId,
           pitch: "I would love to collaborate on this project!",
         }),
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.detail || "Failed to apply");
-      }
+      if (!res.ok) throw new Error("Apply failed");
 
-      setAppliedProjects((prev) => [...prev, projectId]);
-      const updated = [...appliedProjects, projectId];
-      localStorage.setItem("appliedProjects", JSON.stringify(updated));
-      alert("✅ Applied successfully!");
+      // re-fetch applications (single source of truth)
+      const appsRes = await fetch(`${API_BASE}/applications/`, {
+        headers: authHeaders,
+      });
+      const appsData = await appsRes.json();
+      setApplications(appsData);
+      setAppliedProjectIds(appsData.map((a) => a.project));
     } catch (err) {
-      console.error("❌ Error:", err);
-      alert("Could not apply. Check console for details.");
+      alert("Could not apply. Try again.");
     }
   };
 
-  // fetch dashboard data and enrich nested brand objects if needed
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        // PROFILE
-        const profileRes = await fetch(`${API_BASE}/creator-profile/`, {
-          headers,
-        });
-        if (!profileRes.ok) throw new Error("Profile fetch failed");
-        const profileData = await profileRes.json();
+  /* ===================== SHOWCASE SLOT ===================== */
+  function ShowcaseSlot({ index, image }) {
+    const uploadImage = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
 
-        // PROJECTS (may include brand as id)
-        const projectsRes = await fetch(`${API_BASE}/projects/`, { headers });
-        if (!projectsRes.ok) throw new Error("Projects fetch failed");
-        let projectsData = await projectsRes.json();
+      const formData = new FormData();
+      formData.append(`image_${index}`, file);
 
-        // enrich each project's brand if needed
-        projectsData = await Promise.all(
-          projectsData.map(async (p) => {
-            if (!p.brand) return p;
-            const brandObj = await fetchBrandIfNeeded(p.brand);
-            return { ...p, brand: brandObj };
-          })
-        );
+      const res = await fetch(`${API_BASE}/creator-profile/showcase/`, {
+        method: "PATCH",
+        headers: authHeaders,
+        body: formData,
+      });
 
-        // STORED APPLIED PROJECTS
-        const savedApplied =
-          JSON.parse(localStorage.getItem("appliedProjects")) || [];
-
-        // APPLICATIONS FROM BACKEND (to compute applied project ids)
-        const applicationsRes = await fetch(`${API_BASE}/applications/`, {
-          headers,
-        });
-        let appliedIds = [...savedApplied];
-        if (applicationsRes.ok) {
-          const appData = await applicationsRes.json();
-          appliedIds = [
-            ...new Set([...appliedIds, ...appData.map((a) => a.project)]),
-          ];
-        }
-
-        setProfile((prev) => ({
-  ...prev,               // 👈 keep existing (new image!)
-  ...profileData,        // backend data
-  profile_image: prev?.profile_image || profileData.profile_image,
-  projects_applied: appliedIds.length,
-}));
-        setProjects(projectsData);
-        setAppliedProjects(appliedIds);
-      } catch (err) {
-        console.error("Dashboard load error:", err);
-        setError(err.message || "Failed to load dashboard");
-      } finally {
-        setLoading(false);
-      }
+      if (!res.ok) return alert("Upload failed");
+      const updatedProfile = await res.json();
+      setProfile(updatedProfile);
     };
 
-    fetchDashboardData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return (
+      <label className="showcase-slot" role="button">
+        {image ? <img src={image} alt="" /> : <div className="empty-slot">+</div>}
+        <input type="file" hidden accept="image/*" onChange={uploadImage} />
+        <div className="slot-overlay">{image ? "Change" : "Upload"}</div>
+      </label>
+    );
+  }
 
-  useEffect(() => {
-    const fetchSummary = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/creator/summary/`, { headers });
-        if (!res.ok) throw new Error("Failed to fetch summary");
-        const summaryData = await res.json();
-        setProfile((prev) => ({
-          ...prev,
-          projects_applied: summaryData.total_applied,
-          hired: summaryData.hired,
-          rejected: summaryData.rejected,
-          pending: summaryData.pending,
-        }));
-      } catch (err) {
-        console.error("❌ Summary fetch error:", err);
-      }
-    };
-
-    fetchSummary();
-  }, [API_BASE, token]);
-
+  /* ===================== UI STATES ===================== */
   if (loading) return <p>Loading dashboard...</p>;
-  if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
-  if (!profile) return <p>No profile data found.</p>;
+  if (error) return <p style={{ color: "red" }}>{error}</p>;
+  if (!profile) return null;
 
+  /* ===================== RENDER ===================== */
   return (
-    <div className="dashboard">
-      <header className="dashboard-header glass">
-        <h1 className="section-title">Creator Dashboard</h1>
-      </header>
+    <div className="dashboard-wrapper">
+      <Notification />
 
-      
-<section id="creator" className="section">
+      <section className="dashboard-panel">
+        <h2>Creator Dashboard</h2>
 
+        {/* ================= PROFILE ================= */}
+        <div className="card profile-card">
+          <ProfileImageUploader
+            image={profile.profile_image}
+            onUpdated={(img) =>
+              setProfile((p) => ({ ...p, profile_image: img }))
+            }
+          />
+          
 
-{/* ===== PROFILE PICTURE SECTION ===== */}
-  <ProfileImageUploader
-  image={profile.profile_image}
-  onUpdated={(newUrl) => {
-    console.log("NEW IMAGE URL:", newUrl);
+          <div className="profile-info">
+            <h3>{profile.full_name || profile.username}</h3>
+            <p className="muted">
+              @{profile.username_handle} <br/> {profile.primary_platform} ·{" "}
+              {profile.followers_count} <br/> {profile.bio}
+            </p>
 
-    setProfile((prev) => ({
-      ...prev,
-      profile_image: newUrl,
-    }));
+            <button
+              className="btn outline small edit-profile-btn"
+              onClick={() => setShowEditProfile(true)}
+            >
+              Edit Profile
+            </button>
+          </div>
+        </div>
 
-    // 🔥 TEMP DEBUG
-    setTimeout(() => {
-      console.log("PROFILE AFTER 1s:", profile);
-    }, 1000);
-  }}
-/>
+       {showEditProfile && (
+            <EditProfileModal
+              profile={profile}
+              onClose={() => setShowEditProfile(false)}
+              onUpdated={(updatedProfile) => {
+                setProfile(updatedProfile);
+                setShowEditProfile(false);
 
+                setNotifications((prev) => [
+                  {
+                    id: Date.now(),
+                    type: "success",
+                    message: "Applied successfully!",
+                  },
+                  ...prev,
+                ]);
+              }}
+            />
+          )}
 
+        {/* ================= STATS ================= */}
+        <div className="stats-row">
+          <div className="stat-card">
+            <p>Applied</p>
+            <h4>{stats.applied}</h4>
+          </div>
+          <div className="stat-card blue">
+            <p>Pending</p>
+            <h4>{stats.pending}</h4>
+          </div>
+          <div className="stat-card green">
+            <p>Hired</p>
+            <h4>{stats.hired}</h4>
+          </div>
+          <div className="stat-card red">
+            <p>Rejected</p>
+            <h4>{stats.rejected}</h4>
+          </div>
+        </div>
 
+        {/* ================= SHOWCASE ================= */}
+        <section className="showcase-section">
+          <h4>Showcase Your Best Work</h4>
+          <p className="muted">
+            Brands see these images before sending invites.
+          </p>
 
+          <div className="showcase-grid">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <ShowcaseSlot
+                key={i}
+                index={i}
+                image={profile[`showcase_image_${i}`]}
+              />
+            ))}
+          </div>
+        </section>
 
+        {/* ================= MY APPLICATIONS ================= */}
+        <h4>My Applications</h4>
 
-  <div className="profile-card glass">
-    <div>
-      <h2>{profile.full_name || "Unnamed Creator"}</h2>
-      <p className="username">@{profile.username_handle}</p>
+        {projects.length === 0 && (
+          <p className="muted">
+            You haven’t applied yet.{" "}
+            <Link to="/projects">Browse projects →</Link>
+          </p>
+        )}
 
-      <p>
-        <strong>Platform:</strong> {profile.primary_platform || "N/A"}
-      </p>
-      <p>
-        <strong>Followers:</strong> {profile.followers_count || 0}
-      </p>
+        {projects.filter(p => p.status).map(p => (
+  <div key={p.id} className="application-card">
+    <h5>{p.title}</h5>
 
-      {profile.bio && (
-        <p>
-          <strong>Bio:</strong> {profile.bio}
-        </p>
-      )}
+    {/* STATUS BADGE */}
+    <span className={`badge ${p.status}`}>
+      {p.status === "pending" && "Pending" }
+      {p.status === "hired" && "Active"}
+      {p.status === "rejected" && "Rejected"}
+    </span>
 
-      <button
-        className="edit-profile-btn"
-        onClick={() => setShowEdit(true)}
+    {/* COLLAB LINK */}
+    {p.status === "hired" && (
+      <Link
+        to={`/mutual/${p.collaboration_id}`}
+        className="go-link"
       >
-        ✏️ Edit Profile Info
-      </button>
-    </div>
+        Go to Collaboration →
+      </Link>
+    )}
   </div>
+))}
 
 
-
-        {showEdit && (
-  <EditProfileModal
-    profile={profile}
-    onUpdated={(updatedProfile) => {
-      console.log("🔴 setProfile(prev → next)", { prev, profileData });
-  setProfile((prev) => ({
-    ...prev,
-    ...updatedProfile,
-    profile_image: prev.profile_image || updatedProfile.profile_image,
-  }));
-}}
-
-  />
-)}
-
-
-        <div className="stats-grid">
-          <div className="stat-card glass">
-            <p>Projects Applied</p>
-            <h2>{profile.projects_applied || 0}</h2>
-          </div>
-          <div className="stat-card glass">
-            <p>Active Projects</p>
-            <h2>{profile.active_projects || 0}</h2>
-          </div>
-          <div className="stat-card glass">
-            <p>Wallet Balance</p>
-            <h2>₹{profile.wallet_balance || 0}</h2>
-          </div>
-        </div>
-
-        <div className="projects-header">
-          <h2>Browse Projects</h2>
-          <button
-            className="btn glass"
-            onClick={() => navigate("/projects")}
-            style={{
-              marginLeft: "auto",
-              background: "#00bfa6",
-              color: "white",
-              padding: "8px 16px",
-              borderRadius: "8px",
-              border: "none",
-              cursor: "pointer",
-              transition: "0.3s ease",
-            }}
-          >
-            See All Projects →
-          </button>
-        </div>
-
-        <div className="projects">
-          <h2>Your Projects</h2>
-          <div className="project-list">
-            {projects.length > 0 ? (
-              projects.map((p) => (
-                <div key={p.id} className="project-card glass">
-                  <h3>{p.title}</h3>
-                  <p>{p.description}</p>
-                  <div className="meta">
-                    <span>💰 Budget: ₹{p.budget}</span>
-                    <span>📅 Deadline: {p.deadline}</span>
-                    <span>
-                      🏢 Brand:{" "}
-                      {p.brand?.brand_name ||
-                        p.brand?.user?.username ||
-                        p.brand ||
-                        "Unknown"}
-                    </span>
-                  </div>
-                  <button
-                    disabled={appliedProjects.includes(p.id)}
-                    onClick={() => handleApply(p.id)}
-                  >
-                    {appliedProjects.includes(p.id) ? "Applied" : "Apply"}
-                  </button>
-                </div>
-              ))
-            ) : (
-              <p>No projects available right now.</p>
-            )}
-          </div>
-        </div>
-        <Notification />
+        <Link className="browse-projects-link" to="/projects">
+          Browse Available Projects →
+        </Link>
       </section>
     </div>
   );

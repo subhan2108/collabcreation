@@ -1,6 +1,7 @@
 // src/components/BrandDashboard.jsx
 import { useEffect, useState } from "react";
 import Notification from "./Notification";
+import "../styles/dashboard.css"
 
 
 export default function BrandDashboard() {
@@ -12,6 +13,8 @@ export default function BrandDashboard() {
     budget: "",
     deadline: "",
   });
+
+  
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -173,85 +176,168 @@ export default function BrandDashboard() {
   if (!profile) return <p>No profile data found.</p>;
 
   return (
-    <div className="dashboard">
-      <section id="brand" className="section">
+     <div className="brand-dashboard">
+      <section className="dashboard-section">
         <h1 className="section-title">Brand Dashboard</h1>
 
-        {/* ===== Profile Box ===== */}
-        <div className="profile-card glass">
-          <img src={profile.profile_image || "/default-avatar.png"} alt="Brand" className="profile-pic" />
-          <div>
-            <h2>{profile.brand_name || profile.company_name || profile.user?.username}</h2>
-            <p>{profile.primary_goal || profile.industry || ""}</p>
+        {/* Profile Card */}
+        <div className="profile-card">
+          <img
+            src={profile.profile_image || "/default-avatar.png"}
+            alt="Brand"
+            className="profile-pic"
+          />
+          <div className="profile-info">
+            <h2 className="profile-name">
+              {profile.brand_name ||
+                profile.company_name ||
+                profile.user?.username}
+            </h2>
+            <p className="profile-industry">
+              {profile.primary_goal || profile.industry || ""}
+            </p>
             {profile.website_social && (
-              <a href={profile.website_social} target="_blank" rel="noreferrer">
+              <a
+                href={profile.website_social}
+                target="_blank"
+                rel="noreferrer"
+                className="profile-link"
+              >
                 {profile.website_social}
               </a>
             )}
-            <p>{profile.description}</p>
+            <p className="profile-description">{profile.description}</p>
           </div>
         </div>
 
-        {/* ===== Post Project ===== */}
-        <div className="post-project glass">
-          <h2>Post a New Project</h2>
-          <form onSubmit={handleCreate}>
-            <input type="text" placeholder="Project Title" value={newProject.title} onChange={(e) => setNewProject({ ...newProject, title: e.target.value })} />
-            <textarea placeholder="Project Description" value={newProject.description} onChange={(e) => setNewProject({ ...newProject, description: e.target.value })} />
-            <input type="text" placeholder="Skills Required (e.g. Instagram, YouTube)" value={newProject.skills_required || ""} onChange={(e) => setNewProject({ ...newProject, skills_required: e.target.value })} />
-            <div className="two-col">
-              <input type="text" placeholder="Budget (₹)" value={newProject.budget} onChange={(e) => setNewProject({ ...newProject, budget: e.target.value })} />
-              <input type="date" value={newProject.deadline} onChange={(e) => setNewProject({ ...newProject, deadline: e.target.value })} />
+        {/* Post Project Form */}
+        <div className="post-project-card">
+          <h2 className="card-title">Post a New Project</h2>
+          <form onSubmit={handleCreate} className="project-form">
+            <input
+              type="text"
+              placeholder="Project Title"
+              value={newProject.title}
+              onChange={(e) =>
+                setNewProject({ ...newProject, title: e.target.value })
+              }
+              className="form-input"
+            />
+            <textarea
+              placeholder="Project Description"
+              value={newProject.description}
+              onChange={(e) =>
+                setNewProject({ ...newProject, description: e.target.value })
+              }
+              className="form-textarea"
+            />
+            <input
+              type="text"
+              placeholder="Skills Required (e.g. Instagram, YouTube)"
+              value={newProject.skills_required}
+              onChange={(e) =>
+                setNewProject({
+                  ...newProject,
+                  skills_required: e.target.value,
+                })
+              }
+              className="form-input"
+            />
+            <div className="form-row">
+              <input
+                type="text"
+                placeholder="Budget (₹)"
+                value={newProject.budget}
+                onChange={(e) =>
+                  setNewProject({ ...newProject, budget: e.target.value })
+                }
+                className="form-input"
+              />
+              <input
+                type="date"
+                value={newProject.deadline}
+                onChange={(e) =>
+                  setNewProject({ ...newProject, deadline: e.target.value })
+                }
+                className="form-input"
+              />
             </div>
-            <button type="submit">Create Project</button>
+            <button type="submit" className="submit-btn">
+              Create Project
+            </button>
           </form>
         </div>
 
-        {/* ===== Your Projects ===== */}
-        <div className="projects">
-          <h2>Your Projects</h2>
+        {/* Your Projects */}
+        <div className="projects-section">
+          <h2 className="section-subtitle">Your Projects</h2>
           {projects.length > 0 ? (
-            projects.map((p) => (
-              <div key={p.id} className="project-card glass">
-                <h3>{p.title}</h3>
-                <p>{p.description}</p>
-                <div className="meta">
-                  <span>💰 Budget: ₹{p.budget}</span>
-                  <span>📅 Deadline: {p.deadline}</span>
+            <div className="projects-list">
+              {projects.map((p) => (
+                <div key={p.id} className="project-card">
+                  <h3 className="project-title">{p.title}</h3>
+                  <p className="project-description">{p.description}</p>
+                  <div className="project-meta">
+                    <span>💰 Budget: ₹{p.budget}</span>
+                    <span>📅 Deadline: {p.deadline}</span>
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           ) : (
-            <p>No projects created yet.</p>
+            <p className="no-items">No projects created yet.</p>
           )}
         </div>
 
-        {/* ===== Creator Applications ===== */}
-        <div className="applications">
-          <h2>Creator Applications</h2>
+        {/* Creator Applications */}
+        <div className="applications-section">
+          <h2 className="section-subtitle">Creator Applications</h2>
           {applications.length > 0 ? (
-            applications.map((a) => (
-              <div key={a.id} className="application-card glass">
-                <div>
-                  <h3>
-                    {a.creator?.full_name || a.creator?.username || `User ${a.creator?.id || a.creator}`} – {a.creator?.followers_count ?? 0} Followers
-                  </h3>
-                  <p>Portfolio: <a href={a.creator?.portfolio || "#"} className="link">{a.creator?.portfolio || "#"}</a></p>
-                  <p>Pitch: {a.pitch}</p>
+            <div className="applications-list">
+              {applications.map((a) => (
+                <div key={a.id} className="application-card">
+                  <div className="application-info">
+                    <h3 className="applicant-name">
+                      {a.creator?.full_name ||
+                        a.creator?.username ||
+                        `User ${a.creator?.id}`}{" "}
+                      – {a.creator?.followers_count ?? 0} Followers
+                    </h3>
+                    <p className="applicant-portfolio">
+                      Portfolio:{" "}
+                      <a
+                        href={a.creator?.portfolio || "#"}
+                        className="portfolio-link"
+                      >
+                        {a.creator?.portfolio || "#"}
+                      </a>
+                    </p>
+                    <p className="applicant-pitch">Pitch: {a.pitch}</p>
+                  </div>
+                  <div className="application-actions">
+                    <button
+                      className="btn-hire"
+                      onClick={() => handleHire(a.id)}
+                    >
+                      Hire
+                    </button>
+                    <button
+                      className="btn-reject"
+                      onClick={() => handleReject(a.id)}
+                    >
+                      Reject
+                    </button>
+                  </div>
                 </div>
-                <div className="actions">
-                  <button className="btn-primary" onClick={() => handleHire(a.id)}>Hire</button>
-                  <button className="btn-outline" onClick={() => handleReject(a.id)}>Reject</button>
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
           ) : (
-            <p>No applications yet.</p>
+            <p className="no-items">No applications yet.</p>
           )}
         </div>
 
         <Notification />
       </section>
-    </div>
-  );
+    </div>  
+    );
 }

@@ -152,12 +152,27 @@ class ProjectDetailView(generics.RetrieveAPIView):
 # APPLICATION VIEWS
 # ---------------------------
 
+from rest_framework.response import Response
+
 class ApplicationCreateView(generics.CreateAPIView):
     serializer_class = ApplicationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save(creator=self.request.user)
+        self.application = serializer.save(creator=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+
+        return Response(
+            {
+                "project": self.application.project.id,
+                "status": self.application.status,
+                "application_id": self.application.id,
+            },
+            status=201
+        )
+     
 
 
 class ApplicationListView(generics.ListAPIView):
@@ -734,3 +749,74 @@ class CreatorProfileImageUpdateView(APIView):
             {"profile_image": cloudinary_url},
             status=status.HTTP_200_OK
         )
+    
+
+
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def creator_stats(request):
+    user = request.user
+
+    if user.role != "creator":
+        return Response({"error": "Not a creator"}, status=403)
+
+    apps = Application.objects.filter(creator=user)
+
+    return Response({
+        "applied": apps.count(),
+        "pending": apps.filter(status="pending").count(),
+        "hired": apps.filter(status="hired").count(),
+        "rejected": apps.filter(status="rejected").count(),
+    })
+
+
+
+class CreatorShowcaseUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        profile = request.user.creatorprofile
+
+        for i in [1, 2, 3, 4, 5, 6]:  # showcase_image_1 to showcase_image_6
+            image = request.FILES.get(f"image_{i}")
+            if image:
+                result = cloudinary.uploader.upload(
+                    image,
+                    folder="creator_showcase"
+                )
+                setattr(profile, f"showcase_image_{i}", result["secure_url"])
+
+        profile.save()
+        return Response(CreatorProfileSerializer(profile).data)
+
+
+class CreatorProjectView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        projects = Project.objects.all()
+        serializer = CreatorProjectViewSerializer(
+            projects,
+            many=True,
+            context={"request": request}
+        )
+        return Response(serializer.data)
+
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def withdraw_application(request, project_id):
+    app = Application.objects.filter(
+        project_id=project_id,
+        creator=request.user,
+        status="pending"
+    ).first()
+
+    if not app:
+        return Response({"detail": "Cannot withdraw"}, status=400)
+
+    app.delete()
+    return Response({"success": True})

@@ -1,44 +1,426 @@
-.dashboard {
+/* PAGE */
+.dashboard-wrapper {
+  background: #f5f7fb;
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(to bottom, #0a0a0a, #111, #0a0a0a);
-  color: white;
   padding: 40px;
+  font-family: Inter, system-ui, sans-serif;
 }
 
-.dashboard-container {
-  width: 100%;
-  max-width: 800px;
-  padding: 40px;
-  border-radius: 20px;
-  text-align: center;
-}
-
-.stats-grid {
+/* GRID */
+.dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 20px;
-  margin-top: 30px;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  max-width: 1200px;
+  margin: auto;
+}
+
+/* PANELS */
+.dashboard-panel {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+.panel-title {
+  text-align: center;
+  font-size: 22px;
+  margin-bottom: 24px;
+}
+
+/* CARDS */
+.card {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.profile-card h3 {
+  margin: 0;
+}
+
+/* AVATARS */
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+
+.brand-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 22px;
+}
+
+/* STATS */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
 .stat-card {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  padding: 20px;
+  background: #f1f5f9;
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
 }
 
 .stat-card h4 {
-  font-size: 0.95rem;
-  color: #ccc;
-  margin-bottom: 6px;
+  font-size: 20px;
+  margin-top: 6px;
 }
 
-.stat-card span {
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: #3b82f6;
+.stat-card.green { background: #ecfdf5; color: #059669; }
+.stat-card.blue { background: #eff6ff; color: #2563eb; }
+.stat-card.red { background: #fef2f2; color: #dc2626; }
+.stat-card.orange { background: #fff7ed; color: #ea580c; }
+
+/* SECTIONS */
+.section-heading {
+  font-size: 16px;
+  margin-bottom: 12px;
 }
+
+/* PROJECTS */
+.project-card {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+/* APPLICATIONS */
+.application-card {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.applicant {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.applicant img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+/* BUTTONS */
+.btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn.primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.btn.success {
+  background: #16a34a;
+  color: #fff;
+}
+
+.btn.danger {
+  background: #dc2626;
+  color: #fff;
+}
+
+/* TEXT */
+.muted {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* RESPONSIVE */
+@media (max-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+
+/* Notification overlay */
+.notification {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+}
+
+/* Buttons */
+.btn.outline {
+  background: transparent;
+  border: 1px solid #d1d5db;
+}
+
+.btn.small {
+  padding: 6px 12px;
+  font-size: 13px;
+  position: absolute;
+  right: 0px;
+}
+
+/* Error */
+.error {
+  color: #dc2626;
+}
+
+/* Disabled button */
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+.notification-bell {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+}
+
+.notification-bell button {
+  background: #fff;
+  border-radius: 50%;
+  border: none;
+  padding: 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.notification-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: red;
+  border-radius: 50%;
+}
+
+.notification-dropdown {
+  margin-top: 10px;
+  background: white;
+  width: 260px;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  padding: 10px;
+}
+
+.notification-item {
+  padding: 8px;
+  font-size: 14px;
+  border-radius: 6px;
+}
+
+.notification-item.success {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.notification-item.error {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+
+
+.notification-wrapper {
+  position: fixed;
+  top: 18px;
+  right: 24px;
+  z-index: 9999;
+}
+
+.notification-dropdown {
+  width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+}
+
+.notification-item.unread {
+  background: rgba(0, 191, 166, 0.08);
+}
+
+
+
+/* ===============================
+   PROFILE IMAGE CIRCLE
+================================ */
+
+.profile-pic-uploader {
+  position: relative;
+}
+
+/* Fixed circular container */
+.profile-pic-label {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  display: block;
+}
+
+/* Image fits circle */
+.profile-pic-circle {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+/* Overlay hidden by default */
+.profile-pic-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  border-radius: 50%;
+}
+
+/* Show overlay only on hover */
+.profile-pic-label:hover .profile-pic-overlay {
+  opacity: 1;
+}
+
+.profile-pic-label:hover .profile-pic-circle {
+  transform: scale(1.05);
+}
+
+
+.notification-btn{
+  background: black;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  color: black;
+  border-radius: 50%;
+}
+
+.profile-pic-large{
+  object-fit: cover;
+}
+
+.cropper-wrapper {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+
+.showcase-section {
+  margin-top: 30px;
+}
+
+.showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.showcase-slot {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #f3f4f6;
+  aspect-ratio: 1 / 1;
+}
+
+.showcase-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.empty-slot {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: #9ca3af;
+}
+
+.slot-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  font-weight: 600;
+
+  /* ✅ THIS FIXES THE BUG */
+  pointer-events: none;
+}
+
+.showcase-slot:hover .slot-overlay {
+  opacity: 1;
+}
+
+
+.edit-profile-btn {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px);
+  transition: all 0.25s ease;
+}
+
+.profile-card:hover .edit-profile-btn {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+
+

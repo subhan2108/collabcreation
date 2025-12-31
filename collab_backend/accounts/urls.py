@@ -68,6 +68,12 @@ path(
     CreatorProfileImageUpdateView.as_view(),
     name="creator-profile-image"
 ),
+path("creator/stats/", creator_stats),
+
+path("creator-profile/showcase/", CreatorShowcaseUpdateView.as_view()),
+path("projects/creator-view/", CreatorProjectView.as_view()),
+path("applications/withdraw/<int:project_id>/", withdraw_application),
+
 
 
 
