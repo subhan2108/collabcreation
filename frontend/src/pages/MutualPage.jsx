@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import "./mutual.css"
 
 export default function MutualPage() {
   const [collabs, setCollabs] = useState([]);
