@@ -60,7 +60,15 @@ class BrandProfile(models.Model):
     primary_goal = models.CharField(max_length=200)
     approved = models.BooleanField(default=False)  # admin approves onboarding
     banned = models.BooleanField(default=False)
-    profile_image = models.ImageField(upload_to="brand_profiles/", null=True, blank=True)
+    profile_image = models.URLField(blank=True, null=True)
+
+    showcase_image_1 = models.URLField(blank=True, null=True)
+    showcase_image_2 = models.URLField(blank=True, null=True)
+    showcase_image_3 = models.URLField(blank=True, null=True)
+    showcase_image_4 = models.URLField(blank=True, null=True)
+    showcase_image_5 = models.URLField(blank=True, null=True)
+    showcase_image_6 = models.URLField(blank=True, null=True)
+
 
     def __str__(self):
         return f"Brand: {self.user.username}"

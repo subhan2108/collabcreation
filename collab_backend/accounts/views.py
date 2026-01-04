@@ -257,18 +257,33 @@ class ApplicationHireView(APIView):
 
 
 class ApplicationRejectView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request, pk):
         try:
-            app = Application.objects.get(id=pk)
-            app.status = "rejected"
-            app.save()
+            app = Application.objects.get(
+                id=pk,
+                project__brand=request.user  # 🔒 security
+            )
+
+            # 🔥 PERMANENT DELETE
+            app.delete()
+
             Notification.objects.create(
                 recipient=app.creator,
                 message=f"❌ Sorry {app.creator.username}, you were not selected for '{app.project.title}'."
             )
-            return Response({"success": True, "status": "rejected"})
+
+            return Response({
+                "success": True,
+                "deleted": True
+            }, status=200)
+
         except Application.DoesNotExist:
-            return Response({"error": "Application not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Application not found"},
+                status=404
+            )
 
 
 # ---------------------------
@@ -421,19 +436,31 @@ def onboarding_status(request):
 
 
 
-# views.py
-from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me(request):
-    return Response({
-        "id": request.user.id,
-        "username": request.user.username,
-        "role": request.user.role,
-    })
+    user = request.user
+
+    data = {
+        "id": user.id,
+        "username": user.username,
+        "role": user.role,  # ROLE FIELD (brand / creator)
+    }
+
+    # Attach profile id safely
+    if user.role == "brand":
+        try:
+            data["brand_profile_id"] = user.brandprofile.id
+        except:
+            data["brand_profile_id"] = None
+
+    if user.role == "creator":
+        try:
+            data["creator_profile_id"] = user.creatorprofile.id
+        except:
+            data["creator_profile_id"] = None
+
+    return Response(data)
 
 
 
@@ -820,3 +847,111 @@ def withdraw_application(request, project_id):
 
     app.delete()
     return Response({"success": True})
+
+
+
+class BrandShowcaseUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        try:
+            profile = request.user.brandprofile
+        except BrandProfile.DoesNotExist:
+            return Response(
+                {"error": "Brand profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        updated = False
+
+        for i in range(1, 7):
+            file = request.FILES.get(f"image_{i}")
+            if file:
+                upload = cloudinary.uploader.upload(
+                    file,
+                    folder="brand_showcase"
+                )
+                setattr(profile, f"showcase_image_{i}", upload["secure_url"])
+                updated = True
+
+        if not updated:
+            return Response(
+                {"error": "No images received"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        profile.save()
+
+        return Response({
+            f"showcase_image_{i}": getattr(profile, f"showcase_image_{i}")
+            for i in range(1, 7)
+        })
+
+
+
+from django.db.models import Sum
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def brand_budget_summary(request):
+    user = request.user
+
+    # All projects by brand
+    projects = Project.objects.filter(brand=user)
+
+    total_allocated = projects.aggregate(
+        total=Sum("budget")
+    )["total"] or 0
+
+    # Budget committed = hired applications
+    committed = Application.objects.filter(
+        project__brand=user,
+        status="hired"
+    ).aggregate(
+        total=Sum("project__budget")
+    )["total"] or 0
+
+    available = total_allocated - committed
+
+    return Response({
+        "total_allocated": total_allocated,
+        "committed": committed,
+        "available": available,
+    })
+
+
+class BrandProfileImageUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        try:
+            profile = request.user.brandprofile   # ✅ FIXED
+        except BrandProfile.DoesNotExist:
+            return Response(
+                {"error": "Brand profile not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        image = request.FILES.get("profile_image")
+        if not image:
+            return Response(
+                {"error": "No image file received"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Upload to Cloudinary
+        result = cloudinary.uploader.upload(
+            image,
+            folder="brand_profiles"   # ✅ separate folder
+        )
+
+        cloudinary_url = result.get("secure_url")
+
+        # Save URL in DB
+        profile.profile_image = cloudinary_url
+        profile.save(update_fields=["profile_image"])
+
+        return Response(
+            {"profile_image": cloudinary_url},
+            status=status.HTTP_200_OK
+        )

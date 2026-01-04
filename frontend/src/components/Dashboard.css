@@ -185,8 +185,7 @@
 .btn.small {
   padding: 6px 12px;
   font-size: 13px;
-  position: absolute;
-  right: 0px;
+
 }
 
 /* Error */
@@ -424,3 +423,264 @@ button:disabled {
 
 
 
+.brand-dashboard-page {
+  max-width: 1200px;
+  margin: auto;
+  padding: 24px;
+  background: #f5f7fb;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+/* PROFILE */
+.brand-profile {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.profile-card:hover .edit-profile-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.edit-profile-btn {
+  opacity: 0;
+  transition: 0.25s ease;
+}
+
+
+/* BUDGET */
+.budget-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.amount {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.amount.committed { color: #b45309; }
+.amount.available { color: #15803d; }
+
+/* APPLICATIONS */
+.application-row {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid #e5e7eb;
+  padding: 12px 0;
+}
+
+.app-actions {
+  display: flex;
+  gap: 10px;
+}
+
+
+
+.create-project-card textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.create-project-form .form-row {
+  margin-bottom: 12px;
+}
+
+.create-project-form .split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 700px) {
+  .create-project-form .split {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+
+.create-project-card {
+display: grid;
+}
+
+
+.projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.project-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+
+.project-main h5 {
+  margin-bottom: 4px;
+}
+
+.project-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge.open {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge.active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge.closed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+
+.my-project-card{
+  display: grid;
+  animation: smooth;
+}
+
+.project-row{
+  justify-content: start;
+  align-items: flex-start;
+}
+
+
+
+.dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.chevron {
+  transition: transform 0.25s ease;
+}
+
+.dropdown-header.open .chevron {
+  transform: rotate(180deg);
+}
+
+.dropdown-body {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: all 0.25s ease;
+}
+
+.dropdown-body.open {
+  max-height: 1000px;
+  opacity: 1;
+  transform: translateY(0);
+}
+/* ================= APPLICATION DROPDOWN ================= */
+
+.applications-panel {
+  margin-top: 12px;
+  padding-left: 10px;
+  border-left: 2px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.application-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+}
+
+.application-left {
+  display: flex;
+  gap: 12px;
+  max-width: 75%;
+}
+
+.app-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.app-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-name {
+  font-size: 14px;
+}
+
+.app-meta {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.app-pitch {
+  font-size: 13px;
+  color: #374151;
+  margin-top: 4px;
+}
+
+
+.project-meta{
+ gap: 6px;
+}
+
+
+.project-row.clickable {
+  cursor: pointer;
+}
+
+.project-row.clickable:hover {
+  background: #f1f5f9;
+}
+
+
+
+.application-right {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.application-right button {
+  display: inline-flex !important;
+  min-width: 80px;
+}

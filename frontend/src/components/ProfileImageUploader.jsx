@@ -3,7 +3,7 @@ import Cropper from "react-easy-crop";
 import "./Dashboard.css"
 
 
-export default function ProfileImageUploader({ image, onUpdated = () => {} }) {
+export default function ProfileImageUploader({ image, endpoint, onUpdated = () => {} }) {
   const API_ROOT =
     import.meta.env.VITE_API_BASE_URL?.replace("/api", "") ||
     "http://127.0.0.1:8000";
@@ -90,7 +90,7 @@ async function getCroppedImg(imageSrc, crop) {
     const formData = new FormData();
     formData.append("profile_image", croppedFile);
 
-    const res = await fetch(`${API_ROOT}/api/creator-profile/image/`, {
+    const res = await fetch(`${API_ROOT}/api/${endpoint}/`, {
       method: "PATCH",
       headers: {
         Authorization: `Bearer ${token}`,

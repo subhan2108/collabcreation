@@ -1,343 +1,486 @@
 // src/components/BrandDashboard.jsx
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import Notification from "./Notification";
-import "../styles/dashboard.css"
-
+import ProfileImageUploader from "./ProfileImageUploader";
+import EditBrandProfileModal from "./EditBrandProfileModal";
+import EditProjectModal from "./EditProjectModal";
+import "./Dashboard.css";
+import { useNavigate } from "react-router-dom";
 
 export default function BrandDashboard() {
+  const API_BASE =
+    import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+  const token = localStorage.getItem("access");
+
+  const authHeaders = {
+    Authorization: `Bearer ${token}`,
+  };
+
+  /* ===================== STATE ===================== */
   const [profile, setProfile] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [openProjectId, setOpenProjectId] = useState(null);
+  const [showProjects, setShowProjects] = useState(true);
+  const [openProjectApps, setOpenProjectApps] = useState(null);
+  const [editProject, setEditProject] = useState(null);
+
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
+
   const [newProject, setNewProject] = useState({
     title: "",
     description: "",
+    skills_required: "",
     budget: "",
     deadline: "",
   });
 
-  
-  const [applications, setApplications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
-  const token = localStorage.getItem("access");
-
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: token ? `Bearer ${token}` : "",
-  };
-
-  // helper: fetch creator profile if we only have id
-  const fetchCreatorProfileIfNeeded = async (creatorField) => {
-    // creatorField might be an object or an id
-    if (!creatorField) return null;
-    if (typeof creatorField === "object") return creatorField;
-    try {
-      const res = await fetch(`${API_BASE}/creators/${creatorField}/`, { headers });
-      if (!res.ok) return { id: creatorField, username: "unknown" };
-      const data = await res.json();
-      // serializer for CreatorDetail returns CreatorProfile object — map it to expected UI fields:
-      // try to provide consistent fields used by UI: full_name, followers_count, portfolio, username
-      return {
-        id: creatorField,
-        full_name: data.full_name || data.user?.username || "",
-        followers_count: data.followers_count ?? (data.user?.followers_count ?? 0),
-        portfolio: data.portfolio || data.user?.portfolio || "",
-        username: data.user?.username || `user_${creatorField}`,
-      };
-    } catch (err) {
-      console.error("Error fetching creator profile:", err);
-      return { id: creatorField, username: `user_${creatorField}` };
-    }
-  };
-
-  // --- Hire / Reject Handlers ---
-  const handleHire = async (applicationId) => {
-    try {
-      const res = await fetch(`${API_BASE}/applications/${applicationId}/hire/`, {
-        method: "POST",
-        headers,
-      });
-
-      const data = await res.json();
-      console.log("Hire response:", data);
-
-      if (!res.ok) throw new Error("Hire failed");
-
-      const openMutual = window.confirm(
-        "✅ Creator hired successfully! \n\nDo you want to open the collaboration page?"
-      );
-
-      if (openMutual && data.collaboration_id) {
-        window.location.href = `/mutual/${data.collaboration_id}`;
-      }
-
-      setApplications((prev) => prev.filter((a) => a.id !== applicationId));
-    } catch (err) {
-      console.error(err);
-      alert("❌ Could not hire creator. Check console.");
-    }
-  };
-
-  const handleReject = async (applicationId) => {
-    try {
-      const res = await fetch(`${API_BASE}/applications/${applicationId}/reject/`, {
-        method: "POST",
-        headers,
-      });
-      const data = await res.json();
-      console.log("Reject response:", data);
-
-      if (!res.ok) throw new Error("Reject failed");
-      alert("❌ Creator rejected!");
-      setApplications((prev) => prev.filter((a) => a.id !== applicationId));
-    } catch (err) {
-      console.error(err);
-      alert("❌ Could not reject creator. Check console.");
-    }
-  };
-
-  // --- Fetch profile, projects, and applications ---
+  /* ===================== FETCH DASHBOARD ===================== */
   useEffect(() => {
-    const fetchData = async () => {
+    const loadDashboard = async () => {
       try {
-        // BRAND PROFILE
-        const profileRes = await fetch(`${API_BASE}/brand-profile/`, { headers });
+        const profileRes = await fetch(`${API_BASE}/brand-profile/`, {
+          headers: authHeaders,
+        });
+        const projectRes = await fetch(`${API_BASE}/my-projects/`, {
+          headers: authHeaders,
+        });
+        const appsRes = await fetch(`${API_BASE}/applications/`, {
+          headers: authHeaders,
+        });
+
         if (!profileRes.ok) throw new Error("Profile fetch failed");
-        const profileData = await profileRes.json();
-        setProfile(profileData);
 
-        // PROJECTS
-        const projectsRes = await fetch(`${API_BASE}/projects/`, { headers });
-        if (!projectsRes.ok) throw new Error("Projects fetch failed");
-        const projectsData = await projectsRes.json();
-        setProjects(projectsData);
-
-        // APPLICATIONS (may have creator as id or nested object)
-        const applicationsRes = await fetch(`${API_BASE}/applications/`, { headers });
-        if (!applicationsRes.ok) throw new Error("Applications fetch failed");
-        const applicationsData = await applicationsRes.json();
-
-        // Enrich applications: ensure a.creator is an object with fields UI expects
-        const enrichedApps = await Promise.all(
-          applicationsData.map(async (a) => {
-            const creatorObj = await fetchCreatorProfileIfNeeded(a.creator);
-            return { ...a, creator: creatorObj };
-          })
-        );
-
-        setApplications(enrichedApps);
+        setProfile(await profileRes.json());
+        setProjects(projectRes.ok ? await projectRes.json() : []);
+        setApplications(appsRes.ok ? await appsRes.json() : []);
       } catch (err) {
         console.error(err);
-        setError(err.message || "Unknown error");
+        setError("Failed to load brand dashboard");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadDashboard();
   }, [API_BASE, token]);
 
-  const handleCreate = async (e) => {
+  /* ===================== PROJECT STATS ===================== */
+  const today = new Date();
+
+  const openProjects = projects.filter(
+    (p) =>
+      new Date(p.deadline) >= today &&
+      !applications.some((a) => a.project === p.id && a.status === "hired")
+  ).length;
+
+  const activeProjects = applications.filter(
+    (a) => a.status === "hired"
+  ).length;
+
+  const closedProjects = projects.filter(
+    (p) => new Date(p.deadline) < today
+  ).length;
+
+  /* ===================== SHOWCASE SLOT ===================== */
+  function ShowcaseSlot({ index, image }) {
+    const uploadImage = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append(`image_${index}`, file);
+
+      const res = await fetch(`${API_BASE}/brand-profile/showcase/`, {
+        method: "PATCH",
+        headers: authHeaders,
+        body: formData,
+      });
+
+      if (!res.ok) return alert("Upload failed");
+
+      const updated = await res.json();
+      setProfile((prev) => ({ ...prev, ...updated }));
+    };
+
+    return (
+      <label className="showcase-slot" role="button">
+        {image ? (
+          <img src={image} alt="" />
+        ) : (
+          <div className="empty-slot">+</div>
+        )}
+        <input type="file" hidden accept="image/*" onChange={uploadImage} />
+        <div className="slot-overlay">{image ? "Change" : "Upload"}</div>
+      </label>
+    );
+  }
+
+  /* ===================== ACTIONS ===================== */
+  const handleCreateProject = async (e) => {
     e.preventDefault();
 
-    try {
-      const res = await fetch(`${API_BASE}/projects/create/`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(newProject),
-      });
+    const res = await fetch(`${API_BASE}/projects/create/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(newProject),
+    });
 
-      const data = await res.json();
-      if (!res.ok) {
-        console.error("Create failed:", data);
-        alert(`❌ Failed to create project: ${JSON.stringify(data)}`);
-        return;
-      }
+    if (!res.ok) {
+      alert("Failed to create project");
+      return;
+    }
 
-      setProjects((prev) => [...prev, data]);
-      setNewProject({
-        title: "",
-        description: "",
-        skills_required: "",
-        budget: "",
-        deadline: "",
-      });
-      alert("✅ Project created successfully!");
-    } catch (err) {
-      console.error("Network or fetch error:", err);
-      alert("❌ Failed to create project (network error). Check console.");
+    const data = await res.json();
+    setProjects((prev) => [data, ...prev]);
+
+    setNewProject({
+      title: "",
+      description: "",
+      skills_required: "",
+      budget: "",
+      deadline: "",
+    });
+  };
+
+  const handleHire = async (id) => {
+    const res = await fetch(`${API_BASE}/applications/${id}/hire/`, {
+      method: "POST",
+      headers: authHeaders,
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || "Hire failed");
+      return;
+    }
+
+    setApplications([]);
+    if (data.collaboration_id) {
+      window.location.href = `/mutual/${data.collaboration_id}`;
     }
   };
 
+  const handleReject = async (id) => {
+    await fetch(`${API_BASE}/applications/${id}/reject/`, {
+      method: "POST",
+      headers: authHeaders,
+    });
+
+    setApplications((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  /* ===================== UI STATES ===================== */
   if (loading) return <p>Loading dashboard...</p>;
-  if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
-  if (!profile) return <p>No profile data found.</p>;
+  if (error) return <p className="error">{error}</p>;
+  if (!profile) return null;
 
+  /* ===================== RENDER ===================== */
   return (
-     <div className="brand-dashboard">
-      <section className="dashboard-section">
-        <h1 className="section-title">Brand Dashboard</h1>
+    <div className="dashboard-wrapper">
+      <Notification />
 
-        {/* Profile Card */}
-        <div className="profile-card">
-          <img
-            src={profile.profile_image || "/default-avatar.png"}
-            alt="Brand"
-            className="profile-pic"
+      <section className="dashboard-panel">
+        <h2>Brand Dashboard</h2>
+
+        {/* ================= PROFILE ================= */}
+        <div className="card profile-card">
+          <ProfileImageUploader
+            image={profile.profile_image}
+            endpoint="brand-profile/image"
+            onUpdated={(img) =>
+              setProfile((p) => ({ ...p, profile_image: img }))
+            }
           />
+
           <div className="profile-info">
-            <h2 className="profile-name">
-              {profile.brand_name ||
-                profile.company_name ||
-                profile.user?.username}
-            </h2>
-            <p className="profile-industry">
-              {profile.primary_goal || profile.industry || ""}
+            <h3>{profile.brand_name}</h3>
+            <p className="muted">
+              {profile.industry}
+              <br />
+              {profile.website_social}
+              <br />
+              {profile.description}
             </p>
-            {profile.website_social && (
-              <a
-                href={profile.website_social}
-                target="_blank"
-                rel="noreferrer"
-                className="profile-link"
-              >
-                {profile.website_social}
-              </a>
-            )}
-            <p className="profile-description">{profile.description}</p>
+
+            <button
+              className="btn outline small edit-profile-btn"
+              onClick={() => setShowEditProfile(true)}
+            >
+              Edit Profile
+            </button>
           </div>
         </div>
 
-        {/* Post Project Form */}
-        <div className="post-project-card">
-          <h2 className="card-title">Post a New Project</h2>
-          <form onSubmit={handleCreate} className="project-form">
-            <input
-              type="text"
-              placeholder="Project Title"
-              value={newProject.title}
-              onChange={(e) =>
-                setNewProject({ ...newProject, title: e.target.value })
-              }
-              className="form-input"
-            />
-            <textarea
-              placeholder="Project Description"
-              value={newProject.description}
-              onChange={(e) =>
-                setNewProject({ ...newProject, description: e.target.value })
-              }
-              className="form-textarea"
-            />
-            <input
-              type="text"
-              placeholder="Skills Required (e.g. Instagram, YouTube)"
-              value={newProject.skills_required}
-              onChange={(e) =>
-                setNewProject({
-                  ...newProject,
-                  skills_required: e.target.value,
-                })
-              }
-              className="form-input"
-            />
+        {showEditProfile && (
+          <EditBrandProfileModal
+            profile={profile}
+            onClose={() => setShowEditProfile(false)}
+            onUpdated={(updated) => {
+              setProfile((p) => ({ ...p, ...updated }));
+              setShowEditProfile(false);
+            }}
+          />
+        )}
+
+        {/* ================= SHOWCASE ================= */}
+        <section className="showcase-section">
+          <h4>Brand Showcase</h4>
+          <p className="muted">Creators see these images before applying.</p>
+
+          <div className="showcase-grid">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <ShowcaseSlot
+                key={i}
+                index={i}
+                image={profile[`showcase_image_${i}`]}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* ================= PROJECT STATS ================= */}
+        <div className="stats-row">
+          <div className="stat-card blue">
+            <p>Open Projects</p>
+            <h4>{openProjects}</h4>
+          </div>
+          <div className="stat-card green">
+            <p>Active Projects</p>
+            <h4>{activeProjects}</h4>
+          </div>
+          <div className="stat-card red">
+            <p>Closed Projects</p>
+            <h4>{closedProjects}</h4>
+          </div>
+        </div>
+
+        {/* ================= CREATE PROJECT ================= */}
+        <section className="card create-project-card">
+          <h4>Create New Project</h4>
+          <p className="muted">
+            Post a collaboration opportunity for creators.
+          </p>
+
+          <form className="create-project-form" onSubmit={handleCreateProject}>
             <div className="form-row">
               <input
                 type="text"
+                placeholder="Project Title"
+                value={newProject.title}
+                onChange={(e) =>
+                  setNewProject({
+                    ...newProject,
+                    title: e.target.value,
+                  })
+                }
+                required
+              />
+            </div>
+
+            <div className="form-row">
+              <textarea
+                placeholder="Project Description"
+                value={newProject.description}
+                onChange={(e) =>
+                  setNewProject({
+                    ...newProject,
+                    description: e.target.value,
+                  })
+                }
+                required
+              />
+            </div>
+
+            <div className="form-row split">
+              <input
+                type="text"
+                placeholder="Skills Required"
+                value={newProject.skills_required}
+                onChange={(e) =>
+                  setNewProject({
+                    ...newProject,
+                    skills_required: e.target.value,
+                  })
+                }
+              />
+
+              <input
+                type="number"
                 placeholder="Budget (₹)"
                 value={newProject.budget}
                 onChange={(e) =>
-                  setNewProject({ ...newProject, budget: e.target.value })
+                  setNewProject({
+                    ...newProject,
+                    budget: e.target.value,
+                  })
                 }
-                className="form-input"
+                required
               />
+            </div>
+
+            <div className="form-row split">
               <input
                 type="date"
                 value={newProject.deadline}
                 onChange={(e) =>
-                  setNewProject({ ...newProject, deadline: e.target.value })
+                  setNewProject({
+                    ...newProject,
+                    deadline: e.target.value,
+                  })
                 }
-                className="form-input"
+                required
               />
+
+              <button className="btn primary">Create Project</button>
             </div>
-            <button type="submit" className="submit-btn">
-              Create Project
-            </button>
           </form>
-        </div>
+        </section>
 
-        {/* Your Projects */}
-        <div className="projects-section">
-          <h2 className="section-subtitle">Your Projects</h2>
-          {projects.length > 0 ? (
-            <div className="projects-list">
-              {projects.map((p) => (
-                <div key={p.id} className="project-card">
-                  <h3 className="project-title">{p.title}</h3>
-                  <p className="project-description">{p.description}</p>
+        {/* ================= YOUR PROJECTS ================= */}
+        <section className="card my-project-card">
+          <div
+            className={`dropdown-header ${showProjects ? "open" : ""}`}
+            onClick={() => setShowProjects(!showProjects)}
+          >
+            <h4>Your Projects</h4>
+            <svg className="chevron" width="18" height="18" viewBox="0 0 24 24">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </div>
+
+          <div className={`dropdown-body ${showProjects ? "open" : ""}`}>
+            {projects.length === 0 && (
+              <p className="muted">No projects created yet.</p>
+            )}
+
+            {projects.map((project) => {
+              const isClosed = new Date(project.deadline) < today;
+              const projectApps = applications.filter(
+                (a) => a.project === project.id
+              );
+              const hiredApp = projectApps.find((a) => a.status === "hired");
+
+              return (
+                <div
+                  key={project.id}
+                  className="project-row clickable"
+                  onClick={() => navigate(`/projects/${project.id}`)}
+                >
+                  <div className="project-main">
+                    <h5>{project.title}</h5>
+                    <p className="muted">{project.skills_required}</p>
+                    <span
+                      className={`badge ${
+                        isClosed ? "closed" : hiredApp ? "active" : "open"
+                      }`}
+                    >
+                      {isClosed ? "Closed" : hiredApp ? "Active" : "Open"}
+                    </span>
+                  </div>
+
                   <div className="project-meta">
-                    <span>💰 Budget: ₹{p.budget}</span>
-                    <span>📅 Deadline: {p.deadline}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="no-items">No projects created yet.</p>
-          )}
-        </div>
-
-        {/* Creator Applications */}
-        <div className="applications-section">
-          <h2 className="section-subtitle">Creator Applications</h2>
-          {applications.length > 0 ? (
-            <div className="applications-list">
-              {applications.map((a) => (
-                <div key={a.id} className="application-card">
-                  <div className="application-info">
-                    <h3 className="applicant-name">
-                      {a.creator?.full_name ||
-                        a.creator?.username ||
-                        `User ${a.creator?.id}`}{" "}
-                      – {a.creator?.followers_count ?? 0} Followers
-                    </h3>
-                    <p className="applicant-portfolio">
-                      Portfolio:{" "}
-                      <a
-                        href={a.creator?.portfolio || "#"}
-                        className="portfolio-link"
-                      >
-                        {a.creator?.portfolio || "#"}
-                      </a>
-                    </p>
-                    <p className="applicant-pitch">Pitch: {a.pitch}</p>
-                  </div>
-                  <div className="application-actions">
                     <button
-                      className="btn-hire"
-                      onClick={() => handleHire(a.id)}
+                      className="btn outline small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenProjectApps(
+                          openProjectApps === project.id ? null : project.id
+                        );
+                      }}
                     >
-                      Hire
+                      View Applications
                     </button>
-                    <button
-                      className="btn-reject"
-                      onClick={() => handleReject(a.id)}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="no-items">No applications yet.</p>
-          )}
-        </div>
 
-        <Notification />
+                    <br />
+                  </div>
+
+                  {openProjectApps === project.id && (
+                    <div className="applications-panel">
+                      {projectApps.length === 0 && (
+                        <p className="muted">No applications yet.</p>
+                      )}
+
+                      {projectApps.map((app) => (
+                        <div key={app.id} className="application-row">
+                          <div className="application-left">
+                            <img
+                              src={app.creator_profile_image || "/avatar.png"}
+                              alt=""
+                              className="app-avatar"
+                            />
+
+                            <div className="app-info">
+                              <strong className="app-name">
+                                {app.creator_name}
+                              </strong>
+                              <span className="app-meta">
+                                {app.creator_platform} · {app.creator_followers}{" "}
+                                followers
+                              </span>
+                              <p className="app-pitch">{app.pitch}</p>
+                            </div>
+                          </div>
+
+                          <div className="application-right">
+                            {app.status === "hired" || app.status === "accepted" ? (
+  <button className="btn success" disabled>
+    Hired
+  </button>
+) : (
+  <>
+    <button
+      className="btn success small"
+      onClick={(e) => {
+        e.stopPropagation();
+        handleHire(app.id);
+      }}
+    >
+      Hire
+    </button>
+
+    <button
+      className="btn danger small"
+      onClick={(e) => {
+        e.stopPropagation();
+        handleReject(app.id);
+      }}
+    >
+      Reject
+    </button>
+  </>
+)}
+
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {editProject && (
+          <EditProjectModal
+            project={editProject}
+            onClose={() => setEditProject(null)}
+            onUpdated={(updated) =>
+              setProjects((prev) =>
+                prev.map((p) => (p.id === updated.id ? updated : p))
+              )
+            }
+          />
+        )}
       </section>
-    </div>  
-    );
+    </div>
+  );
 }

@@ -6,6 +6,7 @@ const ProjectDetail = () => {
   const { id } = useParams();
   const [project, setProject] = useState(null);
   const [brand, setBrand] = useState(null);
+  
   const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
   useEffect(() => {

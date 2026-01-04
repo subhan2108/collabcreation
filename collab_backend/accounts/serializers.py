@@ -46,7 +46,16 @@ class BrandProfileSerializer(serializers.ModelSerializer):
     def get_projects_count(self, obj):
         return obj.user.projects.count()
 
+class CollaborationMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Collaboration
+        fields = ["id", "brand", "creator", "project"]
+
+
 class ProjectSerializer(serializers.ModelSerializer):
+
+    collaborations = CollaborationMiniSerializer(many=True, read_only=True)
+
     class Meta:
         model = Project
         fields = '__all__'

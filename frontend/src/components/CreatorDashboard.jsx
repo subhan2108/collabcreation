@@ -5,7 +5,6 @@ import Notification from "./Notification";
 import EditProfileModal from "./EditProfileModal";
 import ProfileImageUploader from "./ProfileImageUploader";
 
-
 export default function CreatorDashboard() {
   const API_BASE =
     import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -56,12 +55,11 @@ export default function CreatorDashboard() {
         });
         const appsData = appsRes.ok ? await appsRes.json() : [];
         /* CREATOR PROJECT VIEW (STATUS BADGES SOURCE) */
-const projectRes = await fetch(`${API_BASE}/projects/creator-view/`, {
-  headers: authHeaders,
-});
-const projectData = projectRes.ok ? await projectRes.json() : [];
-setProjects(projectData);
-
+        const projectRes = await fetch(`${API_BASE}/projects/creator-view/`, {
+          headers: authHeaders,
+        });
+        const projectData = projectRes.ok ? await projectRes.json() : [];
+        setProjects(projectData);
 
         setProfile(profileData);
         setApplications(appsData);
@@ -86,7 +84,7 @@ setProjects(projectData);
     loadDashboard();
   }, [API_BASE, navigate, token]);
 
-   const fetchProjects = async () => {
+  const fetchProjects = async () => {
     try {
       setLoading(true);
 
@@ -163,7 +161,11 @@ setProjects(projectData);
 
     return (
       <label className="showcase-slot" role="button">
-        {image ? <img src={image} alt="" /> : <div className="empty-slot">+</div>}
+        {image ? (
+          <img src={image} alt="" />
+        ) : (
+          <div className="empty-slot">+</div>
+        )}
         <input type="file" hidden accept="image/*" onChange={uploadImage} />
         <div className="slot-overlay">{image ? "Change" : "Upload"}</div>
       </label>
@@ -187,17 +189,17 @@ setProjects(projectData);
         <div className="card profile-card">
           <ProfileImageUploader
             image={profile.profile_image}
+            endpoint="creator-profile/image"
             onUpdated={(img) =>
               setProfile((p) => ({ ...p, profile_image: img }))
             }
           />
-          
 
           <div className="profile-info">
             <h3>{profile.full_name || profile.username}</h3>
             <p className="muted">
-              @{profile.username_handle} <br/> {profile.primary_platform} ·{" "}
-              {profile.followers_count} <br/> {profile.bio}
+              @{profile.username_handle} <br /> {profile.primary_platform} ·{" "}
+              {profile.followers_count} <br /> {profile.bio}
             </p>
 
             <button
@@ -209,25 +211,25 @@ setProjects(projectData);
           </div>
         </div>
 
-       {showEditProfile && (
-            <EditProfileModal
-              profile={profile}
-              onClose={() => setShowEditProfile(false)}
-              onUpdated={(updatedProfile) => {
-                setProfile(updatedProfile);
-                setShowEditProfile(false);
+        {showEditProfile && (
+          <EditProfileModal
+            profile={profile}
+            onClose={() => setShowEditProfile(false)}
+            onUpdated={(updatedProfile) => {
+              setProfile(updatedProfile);
+              setShowEditProfile(false);
 
-                setNotifications((prev) => [
-                  {
-                    id: Date.now(),
-                    type: "success",
-                    message: "Applied successfully!",
-                  },
-                  ...prev,
-                ]);
-              }}
-            />
-          )}
+              setNotifications((prev) => [
+                {
+                  id: Date.now(),
+                  type: "success",
+                  message: "Applied successfully!",
+                },
+                ...prev,
+              ]);
+            }}
+          />
+        )}
 
         {/* ================= STATS ================= */}
         <div className="stats-row">
@@ -277,29 +279,27 @@ setProjects(projectData);
           </p>
         )}
 
-        {projects.filter(p => p.status).map(p => (
-  <div key={p.id} className="application-card">
-    <h5>{p.title}</h5>
+        {projects
+          .filter((p) => p.status)
+          .map((p) => (
+            <div key={p.id} className="application-card">
+              <h5>{p.title}</h5>
 
-    {/* STATUS BADGE */}
-    <span className={`badge ${p.status}`}>
-      {p.status === "pending" && "Pending" }
-      {p.status === "hired" && "Active"}
-      {p.status === "rejected" && "Rejected"}
-    </span>
+              {/* STATUS BADGE */}
+              <span className={`badge ${p.status}`}>
+                {p.status === "pending" && "Pending"}
+                {p.status === "hired" && "Active"}
+                {p.status === "rejected" && "Rejected"}
+              </span>
 
-    {/* COLLAB LINK */}
-    {p.status === "hired" && (
-      <Link
-        to={`/mutual/${p.collaboration_id}`}
-        className="go-link"
-      >
-        Go to Collaboration →
-      </Link>
-    )}
-  </div>
-))}
-
+              {/* COLLAB LINK */}
+              {p.status === "hired" && (
+                <Link to={`/mutual/${p.collaboration_id}`} className="go-link">
+                  Go to Collaboration →
+                </Link>
+              )}
+            </div>
+          ))}
 
         <Link className="browse-projects-link" to="/projects">
           Browse Available Projects →

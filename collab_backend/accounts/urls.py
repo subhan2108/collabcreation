@@ -73,9 +73,9 @@ path("creator/stats/", creator_stats),
 path("creator-profile/showcase/", CreatorShowcaseUpdateView.as_view()),
 path("projects/creator-view/", CreatorProjectView.as_view()),
 path("applications/withdraw/<int:project_id>/", withdraw_application),
-
-
-
+path("brand-profile/showcase/", BrandShowcaseUpdateView.as_view()),
+path("brand/budget-summary/", brand_budget_summary),
+path("brand-profile/image/", BrandProfileImageUpdateView.as_view())
 
 
 ]
