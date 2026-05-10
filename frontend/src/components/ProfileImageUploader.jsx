@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import Cropper from "react-easy-crop";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../supabaseClient";
 import "./Dashboard.css"
 
 
 export default function ProfileImageUploader({ image, endpoint, onUpdated = () => {} }) {
+  const { user } = useAuth();
   const API_ROOT =
     import.meta.env.VITE_API_BASE_URL?.replace("/api", "") ||
     "http://127.0.0.1:8000";
@@ -87,7 +90,8 @@ async function getCroppedImg(imageSrc, crop) {
       // In a real app, you'd upload to Supabase Storage first.
       // For now, we'll use a local blob URL or assume a placeholder.
       // If you want real persistence, we'll need a storage bucket named 'avatars'.
-      const fileName = `${user.id}-${Date.now()}.jpg`;
+      // We use a folder-based path (userId/filename) for better organization and security
+      const fileName = `${user.id}/avatar_${Date.now()}.jpg`;
       
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("avatars")
@@ -100,23 +104,16 @@ async function getCroppedImg(imageSrc, crop) {
           .from("avatars")
           .getPublicUrl(fileName);
         publicUrl = urlData.publicUrl;
+      } else {
+        throw uploadError;
       }
 
-      const { data, error } = await supabase
-        .from("creator_profiles")
-        .update({ profile_image: publicUrl })
-        .eq("user_id", user.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      onUpdated(data.profile_image);
+      onUpdated(publicUrl);
       setPreview(null);
       setShowConfirm(false);
     } catch (err) {
       console.error("Save Error:", err);
-      alert("❌ Failed to save image");
+      alert(`❌ Failed to save image: ${err.message || "Unknown error"}`);
     } finally {
       setUploading(false);
     }

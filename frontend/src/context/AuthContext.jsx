@@ -3,7 +3,7 @@ import { supabase } from "../supabaseClient";
 
 const AuthContext = createContext();
 
-const AUTO_LOGOUT_TIME = 5 * 60 * 1000; // 5 minutes
+const AUTO_LOGOUT_TIME = 60 * 60 * 1000; // 60 minutes
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);

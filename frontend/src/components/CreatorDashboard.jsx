@@ -39,6 +39,12 @@ export default function CreatorDashboard() {
     const loadDashboard = async () => {
       if (!user) return;
       
+      // 🛑 Prevent re-loading if we already have the profile for this user
+      if (profile && profile.user_id === user.id) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
@@ -148,17 +154,24 @@ export default function CreatorDashboard() {
       if (!file) return;
 
       try {
-        // For simplicity, we'll store the URL as a string if we have a public URL, 
-        // or just use a mock URL for now if storage isn't set up.
-        // If you have Supabase Storage configured, we would upload here.
-        // For now, let's assume we are updating the text field.
+        const fileName = `${user.id}/showcase_${index}_${Date.now()}.jpg`;
         
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("creator_showcase")
+          .upload(fileName, file, { upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from("creator_showcase")
+          .getPublicUrl(fileName);
+        
+        const publicUrl = urlData.publicUrl;
         const fieldName = `showcase_image_${index}`;
-        const mockUrl = URL.createObjectURL(file); // This is just local, needs real upload
 
         const { data, error } = await supabase
           .from("creator_profiles")
-          .update({ [fieldName]: mockUrl }) // Ideally use public URL after upload
+          .update({ [fieldName]: publicUrl })
           .eq("user_id", user.id)
           .select()
           .single();
@@ -167,7 +180,7 @@ export default function CreatorDashboard() {
         setProfile(data);
       } catch (err) {
         console.error("Upload Error:", err);
-        alert("Upload failed");
+        alert("Upload failed: " + err.message);
       }
     };
 
@@ -202,9 +215,18 @@ export default function CreatorDashboard() {
           <ProfileImageUploader
             image={profile.profile_image}
             endpoint="creator-profile/image"
-            onUpdated={(img) =>
-              setProfile((p) => ({ ...p, profile_image: img }))
-            }
+            onUpdated={async (imgUrl) => {
+              const { error } = await supabase
+                .from("creator_profiles")
+                .update({ profile_image: imgUrl })
+                .eq("user_id", user.id);
+
+              if (!error) {
+                setProfile((p) => ({ ...p, profile_image: imgUrl }));
+              } else {
+                alert("Could not update database with new image.");
+              }
+            }}
           />
 
           <div className="profile-info">

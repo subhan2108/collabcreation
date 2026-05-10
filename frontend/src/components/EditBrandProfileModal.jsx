@@ -9,6 +9,7 @@ export default function EditBrandProfileModal({ profile, onClose, onUpdated }) {
     industry: profile.industry || "",
     website_social: profile.website_social || "",
     description: profile.description || "",
+    primary_goal: profile.primary_goal || "",
   });
   const [loading, setLoading] = useState(false);
 
@@ -75,6 +76,16 @@ export default function EditBrandProfileModal({ profile, onClose, onUpdated }) {
             onChange={e => setForm({...form, description: e.target.value})}
             placeholder="Tell creators about your brand"
             rows={4}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Marketing Goals / Primary Goal</label>
+          <textarea 
+            value={form.primary_goal} 
+            onChange={e => setForm({...form, primary_goal: e.target.value})}
+            placeholder="What are your marketing goals?"
+            rows={3}
           />
         </div>
 

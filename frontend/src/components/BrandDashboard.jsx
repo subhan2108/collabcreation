@@ -37,6 +37,12 @@ export default function BrandDashboard() {
   useEffect(() => {
     if (!user) return;
 
+    // 🛑 Prevent re-loading if we already have the profile for this user
+    if (profile && profile.user_id === user.id) {
+      setLoading(false);
+      return;
+    }
+
     const loadDashboard = async () => {
       setLoading(true);
       try {
@@ -73,31 +79,37 @@ export default function BrandDashboard() {
           const projectIds = projectData.map((p) => p.id);
           const { data: appsData, error: appsError } = await supabase
             .from("applications")
-            .select(`
-              *,
-              creator_profiles:creator_id (
-                full_name,
-                username_handle,
-                primary_platform,
-                followers_count,
-                profile_image
-              )
-            `)
+            .select("*")
             .in("project_id", projectIds);
 
           if (appsError) throw appsError;
 
-          // Format applications to match frontend expectations
-          const formattedApps = appsData.map(app => ({
-            ...app,
-            creator_name: app.creator_profiles?.full_name || "Unknown",
-            creator_platform: app.creator_profiles?.primary_platform || "N/A",
-            creator_followers: app.creator_profiles?.followers_count || 0,
-            creator_profile_image: app.creator_profiles?.profile_image,
-            project: app.project_id
-          }));
+          if (appsData && appsData.length > 0) {
+            const creatorIds = [...new Set(appsData.map(app => app.creator_id))];
+            const { data: creatorProfiles, error: cpError } = await supabase
+              .from("creator_profiles")
+              .select("*")
+              .in("user_id", creatorIds);
 
-          setApplications(formattedApps);
+            if (cpError) throw cpError;
+
+            // Format applications to match frontend expectations
+            const formattedApps = appsData.map(app => {
+              const cp = creatorProfiles?.find(p => p.user_id === app.creator_id);
+              return {
+                ...app,
+                creator_name: cp?.full_name || "Unknown",
+                creator_platform: cp?.primary_platform || "N/A",
+                creator_followers: cp?.followers_count || 0,
+                creator_profile_image: cp?.profile_image,
+                project: app.project_id
+              };
+            });
+
+            setApplications(formattedApps);
+          } else {
+            setApplications([]);
+          }
         }
       } catch (err) {
         console.error("Error loading dashboard:", err);
@@ -133,27 +145,40 @@ export default function BrandDashboard() {
       const file = e.target.files[0];
       if (!file) return;
 
-      // In a real app, you'd upload to Supabase Storage first
-      // For now, let's simulate updating the profile record
-      const mockUrl = URL.createObjectURL(file); 
-      
-      const updateData = {};
-      updateData[`showcase_image_${index}`] = mockUrl;
+      try {
+        const fileName = `${user.id}/showcase_${index}_${Date.now()}.jpg`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("brand_showcase")
+          .upload(fileName, file, { upsert: true });
 
-      const { data, error } = await supabase
-        .from("brand_profiles")
-        .update(updateData)
-        .eq("user_id", user.id)
-        .select()
-        .single();
+        if (uploadError) throw uploadError;
+        let publicUrl;
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage
+            .from("brand_showcase")
+            .getPublicUrl(fileName);
+          publicUrl = urlData.publicUrl;
+        } else {
+          throw uploadError;
+        }
 
-      if (error) {
-        console.error("Showcase update error:", error);
-        alert("Upload failed");
-        return;
+        const updateData = {};
+        updateData[`showcase_image_${index}`] = publicUrl;
+
+        const { data, error } = await supabase
+          .from("brand_profiles")
+          .update(updateData)
+          .eq("user_id", user.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        setProfile(data);
+      } catch (err) {
+        console.error("Showcase update error:", err);
+        alert("Upload failed: " + err.message);
       }
-
-      setProfile(data);
     };
 
     return (
@@ -497,8 +522,14 @@ export default function BrandDashboard() {
 
                           <div className="application-right">
                             {app.status === "hired" ? (
-                              <button className="btn success" disabled>
-                                Hired
+                              <button 
+                                className="btn btn-primary small" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/mutual/${app.id}`);
+                                }}
+                              >
+                                View Collaboration
                               </button>
                             ) : app.status === "rejected" ? (
                                <button className="btn danger" disabled>Rejected</button>

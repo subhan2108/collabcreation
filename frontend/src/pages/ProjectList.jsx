@@ -60,6 +60,8 @@ export default function ProjectList() {
   };
 
   useEffect(() => {
+    // 🛑 Prevent re-fetching if we already have projects
+    if (projects.length > 0) return;
     fetchProjects();
   }, [user]);
 

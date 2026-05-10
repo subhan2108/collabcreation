@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { supabase } from "../supabaseClient";
+import { useAuth } from "../context/AuthContext";
 import "./mutual.css"
 
 export default function MutualPage() {
@@ -9,6 +11,9 @@ export default function MutualPage() {
 
   const [timeLeft, setTimeLeft] = useState("");
   const [isExpired, setIsExpired] = useState(false);
+  const [showBrief, setShowBrief] = useState(false);
+  const [deliverableUrl, setDeliverableUrl] = useState("");
+  const [deliverableNote, setDeliverableNote] = useState("");
   const [chatDisabled, setChatDisabled] = useState(false);
 
   const [selectedCollab, setSelectedCollab] = useState(null);
@@ -24,27 +29,78 @@ export default function MutualPage() {
 
   const { collabId } = useParams();
   const navigate = useNavigate();
-
-  const API_BASE = import.meta.env.VITE_API_BASE_URL;
-  const token = localStorage.getItem("access");
-  const currentUserId = JSON.parse(localStorage.getItem("user"))?.id;
+  const { user } = useAuth();
 
   // --------------------------------------------------
   // FETCH COLLABORATIONS
   // --------------------------------------------------
+  // --------------------------------------------------
+  // FETCH COLLABORATIONS
+  // --------------------------------------------------
   const fetchCollabs = async () => {
+    if (!user) return;
     try {
-      const res = await fetch(`${API_BASE}/collaborations/`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+      setLoading(true);
+      
+      // 1. Fetch raw hired applications
+      const { data: apps, error: appsError } = await supabase
+        .from("applications")
+        .select("*")
+        .eq("status", "hired");
+
+      if (appsError) throw appsError;
+      if (!apps || apps.length === 0) {
+        setCollabs([]);
+        return;
+      }
+
+      // 2. Fetch all raw projects involved
+      const projectIds = [...new Set(apps.map(a => a.project_id))];
+      const { data: projectsData } = await supabase
+        .from("projects")
+        .select("*")
+        .in("id", projectIds);
+
+      // 3. Fetch all raw brand profiles
+      const brandIds = [...new Set(projectsData?.map(p => p.brand_id) || [])];
+      const { data: bProfiles } = await supabase
+        .from("brand_profiles")
+        .select("*")
+        .in("user_id", brandIds);
+
+      // 4. Fetch all raw creator profiles
+      const creatorIds = [...new Set(apps.map(a => a.creator_id))];
+      const { data: cProfiles } = await supabase
+        .from("creator_profiles")
+        .select("*")
+        .in("user_id", creatorIds);
+
+      // 5. Fetch core profiles for backup names
+      const allUserIds = [...new Set([...brandIds, ...creatorIds])];
+      const { data: coreProfiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, username")
+        .in("id", allUserIds);
+
+      // 6. Manual Stitching (The MNC way)
+      const merged = apps.map(app => {
+        const project = projectsData?.find(p => p.id === app.project_id);
+        const creator = cProfiles?.find(p => p.user_id === app.creator_id) || 
+                       coreProfiles?.find(p => p.id === app.creator_id);
+        const brand = bProfiles?.find(p => p.user_id === project?.brand_id) || 
+                     coreProfiles?.find(p => p.id === project?.brand_id);
+
+        return {
+          ...app,
+          project_details: project,
+          creator_info: creator,
+          brand_info: brand
+        };
       });
 
-      if (!res.ok) throw new Error("Failed to load collaborations");
-      const data = await res.json();
-      setCollabs(data);
+      setCollabs(merged);
     } catch (err) {
+      console.error("Fetch Collabs Error:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -52,8 +108,10 @@ export default function MutualPage() {
   };
 
   useEffect(() => {
+    // 🛑 Prevent re-fetching if we already have collaborations
+    if (collabs.length > 0) return;
     fetchCollabs();
-  }, []);
+  }, [user]);
 
   // --------------------------------------------------
   // ACTIVE COLLAB
@@ -66,9 +124,9 @@ export default function MutualPage() {
   // DEADLINE TIMER
   // --------------------------------------------------
   useEffect(() => {
-    if (!activeCollab?.project?.deadline) return;
+    if (!activeCollab?.project_details?.deadline) return;
 
-    const deadline = new Date(activeCollab.project.deadline + "T23:59:59");
+    const deadline = new Date(activeCollab.project_details.deadline + "T23:59:59");
 
     const timer = setInterval(() => {
       const now = new Date();
@@ -111,42 +169,89 @@ export default function MutualPage() {
   // --------------------------------------------------
   const handleSubmitReview = async () => {
     if (!rating) return alert("Please give a rating");
+    if (!activeCollab) return;
 
     try {
-      const res = await fetch(`${API_BASE}/reviews/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          reviewee:
-            currentUserId === activeCollab.brand.id
-              ? activeCollab.creator.id
-              : activeCollab.brand.id,
+      setLoading(true);
+      
+      // 1. Insert review into Supabase
+      const { error: reviewError } = await supabase
+        .from("reviews")
+        .insert([{
+          project_id: activeCollab.project_id,
+          reviewer_id: user.id,
+          reviewee_id: otherUserId,
           rating,
-          review_text: reviewText,
-          project: activeCollab.project.id,
-        }),
-      });
+          review_text: reviewText
+        }]);
 
-      if (!res.ok) throw new Error("Review failed");
+      if (reviewError) throw reviewError;
 
-      // lock collaboration
-      await fetch(`${API_BASE}/collaborations/${activeCollab.id}/lock/`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ is_locked: true }),
-      });
+      // 2. Lock the collaboration (Update status in applications)
+      const { error: lockError } = await supabase
+        .from("applications")
+        .update({ is_locked: true })
+        .eq("id", activeCollab.id);
 
-      alert("Review submitted!");
+      if (lockError) throw lockError;
+
+      alert("Review submitted and collaboration finalized!");
       setShowRatingPopup(false);
+      fetchCollabs(); // Refresh UI
+    } catch (err) {
+      console.error("Review error:", err);
+      alert("Failed to submit review: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --------------------------------------------------
+  // WORK WORKFLOW (SUBMIT / APPROVE)
+  // --------------------------------------------------
+  const handleSubmitWork = async () => {
+    if (!deliverableUrl) return alert("Please provide a link to your work.");
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from("applications")
+        .update({
+          work_status: "review",
+          deliverable_url: deliverableUrl,
+          deliverable_note: deliverableNote,
+          submitted_at: new Date().toISOString()
+        })
+        .eq("id", activeCollab.id);
+
+      if (error) throw error;
+      alert("Work submitted for review!");
       fetchCollabs();
     } catch (err) {
-      alert("Failed to submit review");
+      alert("Submission failed: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveWork = async () => {
+    if (!window.confirm("Are you sure you want to approve this work? This will mark the project as completed.")) return;
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from("applications")
+        .update({
+          work_status: "completed",
+          approved_at: new Date().toISOString()
+        })
+        .eq("id", activeCollab.id);
+
+      if (error) throw error;
+      alert("Work approved! Project completed.");
+      fetchCollabs();
+    } catch (err) {
+      alert("Approval failed: " + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -155,33 +260,69 @@ export default function MutualPage() {
   // --------------------------------------------------
   if (loading) return <p>Loading collaboration...</p>;
   if (error) return <p style={{ color: "red" }}>{error}</p>;
-  if (!activeCollab) return <p>No collaboration found.</p>;
+  if (!activeCollab) return <p>No active collaboration found.</p>;
 
-  const otherUserId =
-    currentUserId === activeCollab.brand.id
-      ? activeCollab.creator.id
-      : activeCollab.brand.id;
+  // Detect if current user is the brand or the creator
+  const isBrand = user.id === activeCollab.project_details?.brand_id;
+  const otherUser = isBrand ? activeCollab.creator_info : activeCollab.brand_info;
+  const otherUserId = isBrand ? activeCollab.creator_id : activeCollab.project_details?.brand_id;  // Status Helpers
+  const status = activeCollab.work_status || "in_progress";
+  const step = status === "in_progress" ? 1 : status === "review" ? 2 : 3;
 
   // --------------------------------------------------
   // UI
   // --------------------------------------------------
   return (
     <div className="mutual-page glass">
-      <h1 className="section-title">🤝 Collaboration</h1>
+      <h1 className="section-title">🤝 Collaboration Hub</h1>
 
-      <div className={`deadline-timer ${isExpired ? "expired" : ""}`}>
-        {isExpired ? "⛔ Deadline Ended" : `⏳ Time Left: ${timeLeft}`}
+      {/* 1. PROGRESS PIPELINE */}
+      <div className="pipeline-container glass">
+        <div className={`step ${step >= 1 ? "active" : ""}`}>
+          <div className="dot">1</div>
+          <span>Working</span>
+        </div>
+        <div className="line"></div>
+        <div className={`step ${step >= 2 ? "active" : ""}`}>
+          <div className="dot">2</div>
+          <span>Review</span>
+        </div>
+        <div className="line"></div>
+        <div className={`step ${step >= 3 ? "active" : ""}`}>
+          <div className="dot">3</div>
+          <span>Completed</span>
+        </div>
       </div>
 
-      <div className="collab-card glass">
-        <h2>{activeCollab.project.title}</h2>
+      <div className="header-actions">
+        <div className={`deadline-timer ${isExpired ? "expired" : ""}`}>
+          ⏱️ {isExpired ? "Deadline Passed" : `Time Remaining: ${timeLeft}`}
+        </div>
+        <button className="btn btn-outline" onClick={() => setShowBrief(!showBrief)}>
+          {showBrief ? "Hide Brief" : "View Project Brief"}
+        </button>
+      </div>
 
-        <p>👔 Brand: {activeCollab.brand.username}</p>
-        <p>🎨 Creator: {activeCollab.creator.username}</p>
+      {showBrief && (
+        <div className="brief-box glass">
+          <h3>Project Requirements</h3>
+          <p>{activeCollab.project_details?.description || "No description provided."}</p>
+          <div className="brief-meta">
+            <span>💰 Budget: ${activeCollab.project_details?.budget || "N/A"}</span>
+            <span>📅 Deadline: {activeCollab.project_details?.deadline || "N/A"}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="collab-card glass">
+        <h2>{activeCollab.project_details?.title || "Untitled Project"}</h2>
+
+        <p>👔 Brand: {activeCollab.brand_info?.brand_name || "Unknown"} ({activeCollab.brand_info?.full_name || activeCollab.brand_info?.username || "Owner"})</p>
+        <p>🎨 Creator: {activeCollab.creator_info?.full_name || activeCollab.creator_info?.username || "Unknown"}</p>
 
         <div className="collab-actions">
           <button
-            className="btn glass"
+            className="btn btn-primary"
             onClick={() => navigate(`/chat/${otherUserId}`)}
             disabled={chatDisabled || activeCollab.is_locked}
           >
@@ -189,19 +330,76 @@ export default function MutualPage() {
           </button>
 
           <button
-            className="btn glass"
+            className="btn btn-outline"
             onClick={() => setShowRatingPopup(true)}
+            disabled={activeCollab.is_locked}
           >
-            ⭐ Rate User
+            ⭐ Rate {isBrand ? "Creator" : "Brand"}
           </button>
 
           <button
-            className="btn-outline"
+            className="btn btn-outline"
             onClick={() => setShowDisputePopup(true)}
           >
-            ⚖ Raise Dispute
+            ⚖️ Raise Dispute
           </button>
         </div>
+      </div>
+
+      {/* 2. ROLE-SPECIFIC WORKFLOW SECTION */}
+      <div className="workflow-section glass">
+        {!isBrand && status === "in_progress" && (
+          <div className="creator-submit">
+            <h3>Submit Your Deliverables</h3>
+            <p>Paste the link to your final work (Google Drive, Video, etc.) below.</p>
+            <input 
+              type="url" 
+              placeholder="https://link-to-your-work.com"
+              value={deliverableUrl}
+              onChange={(e) => setDeliverableUrl(e.target.value)}
+            />
+            <textarea 
+              placeholder="Add a note for the brand..."
+              value={deliverableNote}
+              onChange={(e) => setDeliverableNote(e.target.value)}
+            />
+            <button className="btn btn-primary" onClick={handleSubmitWork} disabled={loading}>
+              {loading ? "Submitting..." : "Submit for Review"}
+            </button>
+          </div>
+        )}
+
+        {isBrand && status === "review" && (
+          <div className="brand-review">
+            <h3>Review Deliverables</h3>
+            <div className="submission-data glass">
+              <p><strong>Link:</strong> <a href={activeCollab.deliverable_url} target="_blank" rel="noreferrer">{activeCollab.deliverable_url}</a></p>
+              <p><strong>Note:</strong> {activeCollab.deliverable_note || "No note provided."}</p>
+            </div>
+            <div className="approval-btns">
+              <button className="btn btn-primary" onClick={handleApproveWork} disabled={loading}>
+                Approve Work
+              </button>
+              <button className="btn btn-outline" onClick={() => navigate(`/chat/${otherUserId}`)}>
+                Request Changes
+              </button>
+            </div>
+          </div>
+        )}
+
+        {status === "review" && !isBrand && (
+          <div className="status-waiting">
+            <h3>Work Submitted</h3>
+            <p>Waiting for the brand to review and approve your work.</p>
+          </div>
+        )}
+
+        {status === "completed" && (
+          <div className="status-completed">
+            <h3>🎉 Collaboration Completed</h3>
+            <p>This project has been successfully finalized. You can now leave a rating if you haven't already.</p>
+          </div>
+        )}
       </div>
 
       {/* ---------------- RATING POPUP ---------------- */}
@@ -262,31 +460,54 @@ export default function MutualPage() {
 
             <button
               className="btn-primary"
+              disabled={loading}
               onClick={async () => {
-                if (!disputeReason || !disputeDesc)
-                  return alert("Fill all fields");
+                if (!disputeReason || !disputeDesc) return alert("Fill all fields");
 
-                const fd = new FormData();
-                fd.append("reason", disputeReason);
-                fd.append("description", disputeDesc);
-                if (evidence) fd.append("evidence", evidence);
+                try {
+                  setLoading(true);
+                  let evidenceUrl = "";
 
-                await fetch(
-                  `${API_BASE}/collabs/${activeCollab.id}/disputes/create/`,
-                  {
-                    method: "POST",
-                    headers: {
-                      Authorization: `Bearer ${token}`,
-                    },
-                    body: fd,
+                  // 1. Upload evidence if exists
+                  if (evidence) {
+                    const fileName = `${Date.now()}_${evidence.name}`;
+                    const { data: uploadData, error: uploadError } = await supabase.storage
+                      .from("creator_showcase") // Reusing this bucket for now
+                      .upload(`${user.id}/disputes/${fileName}`, evidence);
+                    
+                    if (uploadError) throw uploadError;
+                    
+                    const { data: { publicUrl } } = supabase.storage
+                      .from("creator_showcase")
+                      .getPublicUrl(`${user.id}/disputes/${fileName}`);
+                    
+                    evidenceUrl = publicUrl;
                   }
-                );
 
-                alert("Dispute submitted");
-                setShowDisputePopup(false);
+                  // 2. Create dispute record
+                  const { error: disputeError } = await supabase
+                    .from("disputes")
+                    .insert([{
+                      project_id: activeCollab.project_id,
+                      raised_by_id: user.id,
+                      reason: disputeReason,
+                      description: disputeDesc,
+                      evidence_url: evidenceUrl
+                    }]);
+
+                  if (disputeError) throw disputeError;
+
+                  alert("Dispute raised successfully. Our team will review it.");
+                  setShowDisputePopup(false);
+                } catch (err) {
+                  console.error("Dispute error:", err);
+                  alert("Failed to raise dispute: " + err.message);
+                } finally {
+                  setLoading(false);
+                }
               }}
             >
-              Submit Dispute
+              {loading ? "Submitting..." : "Submit Dispute"}
             </button>
           </div>
         </div>

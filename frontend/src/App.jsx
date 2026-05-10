@@ -36,6 +36,7 @@ function App() {
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/chat" element={<Chat />} />
+        <Route path="/chat/:userId" element={<Chat />} />
         <Route path="/wallet" element={<Wallet />} />
         <Route path="/ratings" element={<Ratings />} />
         <Route path="/security" element={<Security />} />

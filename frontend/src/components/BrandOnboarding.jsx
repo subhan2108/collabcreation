@@ -16,6 +16,7 @@ export default function BrandOnboarding() {
   const { user, fetchProfile } = useAuth();
   const [formData, setFormData] = useState({
     brand_name: "",
+    industry: "",
     website_social: "",
     description: "",
     primary_goal: "",
@@ -47,6 +48,7 @@ export default function BrandOnboarding() {
         .insert([{
           user_id: user.id,
           brand_name: formData.brand_name,
+          industry: formData.industry,
           website_social: formData.website_social,
           description: formData.description,
           primary_goal: formData.primary_goal
@@ -129,7 +131,15 @@ export default function BrandOnboarding() {
                     </div>
                     <div className="form-field">
                       <label className="form-label" htmlFor="industry">Industry *</label>
-                      <input className="form-input" id="industry" placeholder="Technology, Fashion, Food, etc." />
+                      <input 
+                        className="form-input" 
+                        id="industry" 
+                        name="industry"
+                        placeholder="Technology, Fashion, Food, etc." 
+                        value={formData.industry}
+                        onChange={handleChange}
+                        required
+                      />
                     </div>
                     <div className="form-field">
                       <label className="form-label" htmlFor="website">Company Website / Social *</label>

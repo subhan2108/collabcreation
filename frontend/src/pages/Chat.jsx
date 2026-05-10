@@ -1,8 +1,10 @@
 import { useEffect, useState, useRef } from "react";
+import { useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function ChatApp() {
   const { user: currentUser, token } = useAuth();
+  const { userId: urlUserId } = useParams();
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -34,6 +36,16 @@ export default function ChatApp() {
     };
     fetchUsers();
   }, [currentUser]);
+
+  // Handle URL Deep-linking
+  useEffect(() => {
+    if (urlUserId && users.length > 0) {
+      const target = users.find(u => String(u.id) === String(urlUserId));
+      if (target) {
+        setSelectedUser(target);
+      }
+    }
+  }, [urlUserId, users]);
 
   // Fetch chat history & setup WebSocket
   useEffect(() => {
