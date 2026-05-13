@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../context/AuthContext";
+import WorkflowVisualizer from "../components/WorkflowVisualizer";
+import WorkflowEditor from "../components/WorkflowEditor";
 import "./mutual.css"
 
 export default function MutualPage() {
@@ -27,6 +29,9 @@ export default function MutualPage() {
   const [disputeDesc, setDisputeDesc] = useState("");
   const [evidence, setEvidence] = useState(null);
 
+  const [showWorkflowEditor, setShowWorkflowEditor] = useState(false);
+  const [workflowData, setWorkflowData] = useState(null);
+
   const { collabId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -41,7 +46,7 @@ export default function MutualPage() {
     if (!user) return;
     try {
       setLoading(true);
-      
+
       // 1. Fetch raw hired applications
       const { data: apps, error: appsError } = await supabase
         .from("applications")
@@ -85,10 +90,10 @@ export default function MutualPage() {
       // 6. Manual Stitching (The MNC way)
       const merged = apps.map(app => {
         const project = projectsData?.find(p => p.id === app.project_id);
-        const creator = cProfiles?.find(p => p.user_id === app.creator_id) || 
-                       coreProfiles?.find(p => p.id === app.creator_id);
-        const brand = bProfiles?.find(p => p.user_id === project?.brand_id) || 
-                     coreProfiles?.find(p => p.id === project?.brand_id);
+        const creator = cProfiles?.find(p => p.user_id === app.creator_id) ||
+          coreProfiles?.find(p => p.id === app.creator_id);
+        const brand = bProfiles?.find(p => p.user_id === project?.brand_id) ||
+          coreProfiles?.find(p => p.id === project?.brand_id);
 
         return {
           ...app,
@@ -99,6 +104,12 @@ export default function MutualPage() {
       });
 
       setCollabs(merged);
+
+      // Load workflow data if exists in active collab
+      const currentActive = collabId ? merged.find(c => String(c.id) === String(collabId)) : null;
+      if (currentActive?.workflow_data) {
+        setWorkflowData(currentActive.workflow_data);
+      }
     } catch (err) {
       console.error("Fetch Collabs Error:", err);
       setError(err.message);
@@ -173,7 +184,7 @@ export default function MutualPage() {
 
     try {
       setLoading(true);
-      
+
       // 1. Insert review into Supabase
       const { error: reviewError } = await supabase
         .from("reviews")
@@ -255,6 +266,32 @@ export default function MutualPage() {
     }
   };
 
+  const handleSaveWorkflow = async (data) => {
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from("applications")
+        .update({ workflow_data: data })
+        .eq("id", activeCollab.id);
+
+      if (error) {
+        if (error.code === 'PGRST100' || error.message.includes('column "workflow_data" does not exist')) {
+          alert("Database Error: Please add a JSONB column 'workflow_data' to your 'applications' table in Supabase.");
+        } else {
+          throw error;
+        }
+      } else {
+        setWorkflowData(data);
+        setShowWorkflowEditor(false);
+        alert("Workflow saved successfully!");
+      }
+    } catch (err) {
+      alert("Failed to save workflow: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // --------------------------------------------------
   // LOADING / ERROR
   // --------------------------------------------------
@@ -278,20 +315,10 @@ export default function MutualPage() {
 
       {/* 1. PROGRESS PIPELINE */}
       <div className="pipeline-container glass">
-        <div className={`step ${step >= 1 ? "active" : ""}`}>
-          <div className="dot">1</div>
-          <span>Working</span>
-        </div>
-        <div className="line"></div>
-        <div className={`step ${step >= 2 ? "active" : ""}`}>
-          <div className="dot">2</div>
-          <span>Review</span>
-        </div>
-        <div className="line"></div>
-        <div className={`step ${step >= 3 ? "active" : ""}`}>
-          <div className="dot">3</div>
-          <span>Completed</span>
-        </div>
+        <WorkflowVisualizer
+          workflowData={workflowData}
+          currentStepId={String(step)}
+        />
       </div>
 
       <div className="header-actions">
@@ -343,6 +370,16 @@ export default function MutualPage() {
           >
             ⚖️ Raise Dispute
           </button>
+
+          {isBrand && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowWorkflowEditor(true)}
+              style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
+            >
+              🏗️ Customize Workflow
+            </button>
+          )}
         </div>
       </div>
 
@@ -352,13 +389,13 @@ export default function MutualPage() {
           <div className="creator-submit">
             <h3>Submit Your Deliverables</h3>
             <p>Paste the link to your final work (Google Drive, Video, etc.) below.</p>
-            <input 
-              type="url" 
+            <input
+              type="url"
               placeholder="https://link-to-your-work.com"
               value={deliverableUrl}
               onChange={(e) => setDeliverableUrl(e.target.value)}
             />
-            <textarea 
+            <textarea
               placeholder="Add a note for the brand..."
               value={deliverableNote}
               onChange={(e) => setDeliverableNote(e.target.value)}
@@ -474,13 +511,13 @@ export default function MutualPage() {
                     const { data: uploadData, error: uploadError } = await supabase.storage
                       .from("creator_showcase") // Reusing this bucket for now
                       .upload(`${user.id}/disputes/${fileName}`, evidence);
-                    
+
                     if (uploadError) throw uploadError;
-                    
+
                     const { data: { publicUrl } } = supabase.storage
                       .from("creator_showcase")
                       .getPublicUrl(`${user.id}/disputes/${fileName}`);
-                    
+
                     evidenceUrl = publicUrl;
                   }
 
@@ -510,6 +547,16 @@ export default function MutualPage() {
               {loading ? "Submitting..." : "Submit Dispute"}
             </button>
           </div>
+        </div>
+      )}
+      {/* ---------------- WORKFLOW EDITOR MODAL ---------------- */}
+      {showWorkflowEditor && (
+        <div className="modal-overlay">
+          <WorkflowEditor
+            onSave={handleSaveWorkflow}
+            onClose={() => setShowWorkflowEditor(false)}
+            initialData={workflowData}
+          />
         </div>
       )}
     </div>
